@@ -12,7 +12,14 @@ issues that need sorting. It runs on Vercel and works on phones, where it can be
 - **Issues**: things that need sorting, with room, priority, date, details and photos, moved through
   open, in progress and resolved.
 
-Everyone signs in with one shared password. There is no Claude account needed.
+Everyone signs in with their own name and password, so their name shows on issues they log, changeovers
+they start, tasks they tick and inventory they change. No Claude account is needed.
+
+- **First time**: sign in with the `APP_PASSWORD` set in Vercel and create the owner account.
+- **Adding people**: the owner adds people by name under Account → People. The first time someone signs in
+  with their name, they choose their own password. The owner can reset a password or remove someone there too.
+- **Owner only**: issues marked "Only visible to me", and the **My list** tab for private reminders, jobs and
+  things to take to the house.
 
 ## Deploy on Vercel
 
@@ -30,7 +37,7 @@ Everyone signs in with one shared password. There is no Claude account needed.
 On first load, the app adds the two changeover checklists and the open questions from the
 "Ziggy owner to guest checklist" doc as issues.
 
-Changing `APP_PASSWORD` signs everyone out. Photos kept in the database are only shown to signed-in people. Photos in Vercel Blob (if you add it) sit at long, unguessable public URLs.
+Changing `APP_PASSWORD` signs everyone out (it also signs the session cookies). Photos kept in the database are only shown to signed-in people. Photos in Vercel Blob (if you add it) sit at long, unguessable public URLs.
 
 ## Run it locally
 

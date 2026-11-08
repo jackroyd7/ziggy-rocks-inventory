@@ -16,7 +16,9 @@ const COND = ["Good", "Fair", "Poor", "Missing"];
 const PRI = { high: 0, medium: 1, low: 2 };
 const STATUS = [["open", "Open"], ["in-progress", "In progress"], ["resolved", "Resolved"]];
 
-const S = { inventory: [], cleans: [], issues: [], checklists: [] };
+const S = { me: null, people: [], inventory: [], cleans: [], issues: [], checklists: [], mylist: [] };
+const isOwner = () => S.me?.role === "owner";
+const nameOf = id => S.people.find(p => p.id === id)?.name || "";
 let loaded = false;
 const ui = { room: "All", search: "", issueFilter: "active", open: new Set(), onlyLeft: new Set(), defaultOpened: false };
 
@@ -27,7 +29,7 @@ async function api(path, { method = "GET", body, raw, type } = {}) {
     headers: raw ? { "content-type": type } : body ? { "content-type": "application/json" } : {},
     body: raw ?? (body ? JSON.stringify(body) : undefined),
   });
-  if (res.status === 401 && path !== "/api/login") { showLogin(); throw new Error("Sign in to continue."); }
+  if (res.status === 401 && path !== "/api/login" && path !== "/api/password") { showLogin(); throw new Error("Sign in to continue."); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Something went wrong. Check your connection and try again.");
   return data;
@@ -96,9 +98,10 @@ function safely(container, fn) {
 document.addEventListener("focusout", () => setTimeout(() => { const fns = [...deferred]; deferred.clear(); fns.forEach(f => f()); }, 0));
 
 /* ---------------- routing ---------------- */
-const TABS = ["inventory", "cleaning", "issues"];
+const TABS = ["inventory", "cleaning", "issues", "mylist"];
 function route() {
-  const tab = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "inventory";
+  let tab = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "inventory";
+  if (tab === "mylist" && S.me && !isOwner()) tab = "inventory";
   $$(".tabs a").forEach(a => a.dataset.tab === tab ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"));
   TABS.forEach(t => ($("#v-" + t).hidden = t !== tab));
   $("#fab").hidden = tab !== "issues";
@@ -172,6 +175,9 @@ function openItem(it = null) {
   segment($("#it-cond"), it?.condition || "Good");
   $("#it-thumb").innerHTML = it?.photo ? `<img src="${esc(it.photo)}" alt="">` : icon("image");
   $("#it-photo").value = ""; $("#it-delete").hidden = !it;
+  const added = it && nameOf(it.createdBy), changed = it && nameOf(it.updatedBy);
+  $("#it-meta").hidden = !(added || changed);
+  $("#it-meta").textContent = [added && `Added by ${added}`, changed && `last changed by ${changed}${it.updatedAt ? " on " + new Date(it.updatedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""}`].filter(Boolean).join(", ").replace(/^l/, "L");
   openSheet("#d-item"); if (!it) $("#it-item").focus();
 }
 $("#open-item").addEventListener("click", () => openItem());
@@ -290,7 +296,7 @@ function coCard(c) {
       return `<div class="room"><div class="room-head"><h4>${esc(room)}</h4><span class="c ${rl ? "left" : "complete"}">${rl ? `${ts.length - rl} of ${ts.length}` : "Done"}</span></div>
         ${shown.map(t => `<button class="task${!t.done && finished ? " missed" : ""}" role="checkbox" aria-checked="${!!t.done}" data-i="${t.i}">
           <span class="box">${icon("check")}</span><span class="t">${esc(t.task)}</span>
-          <span class="when">${t.done && t.doneAt ? esc(fmtTime(t.doneAt)) : !t.done && finished ? "Missed" : ""}</span></button>`).join("")}</div>`;
+          <span class="when">${t.done && t.doneAt ? esc(fmtTime(t.doneAt)) + (nameOf(t.doneBy) ? `<br><span class="by">${esc(nameOf(t.doneBy))}</span>` : "") : !t.done && finished ? "Missed" : ""}</span></button>`).join("")}</div>`;
     }).join("");
     body = `<div class="co-body">
       <div class="co-tools">
@@ -310,7 +316,7 @@ function coCard(c) {
   return `<article class="card changeover" data-id="${esc(c.id)}">
     <div class="co-head" data-toggle role="button" tabindex="0" aria-expanded="${open}">
       ${ring(done, tasks.length, state)}
-      <div style="min-width:0"><h3>${esc(c.type || "Changeover")}</h3><div class="meta"><span>${esc(fmtDate(c.date, { weekday: "long", day: "numeric", month: "long" }))}</span>${c.by ? `<span>· ${esc(c.by)}</span>` : ""}${status}</div></div>
+      <div style="min-width:0"><h3>${esc(c.type || "Changeover")}</h3><div class="meta"><span>${esc(fmtDate(c.date, { weekday: "long", day: "numeric", month: "long" }))}</span>${c.by || nameOf(c.createdBy) ? `<span>· ${esc(c.by || nameOf(c.createdBy))}</span>` : ""}${status}</div></div>
       <span class="btn ghost small" aria-hidden="true">${open ? "Hide" : "Open"}</span>
     </div>
     ${body}${missing}
@@ -334,7 +340,7 @@ for (const sel of ["#co-active", "#co-history"]) {
     const task = e.target.closest(".task");
     if (task) {
       const i = Number(task.dataset.i); const now = new Date().toISOString();
-      const tasks = c.tasks.map((t, j) => j === i ? { ...t, done: !t.done, doneAt: !t.done ? now : null } : t);
+      const tasks = c.tasks.map((t, j) => j === i ? { ...t, done: !t.done, doneAt: !t.done ? now : null, doneBy: !t.done ? S.me?.id : null } : t);
       save("update", "cleans", c.id, { tasks }).catch(() => {});
       if (navigator.vibrate && !c.tasks[i].done) navigator.vibrate(8);
       return;
@@ -354,13 +360,13 @@ for (const sel of ["#co-active", "#co-history"]) {
 $("#starts").addEventListener("click", e => {
   const b = e.target.closest("[data-start]"); if (!b) return;
   $("#start-choice").innerHTML = S.checklists.map(c => `<label><input type="radio" name="cl" value="${esc(c.id)}"${c.id === b.dataset.start ? " checked" : ""}><span><strong>${esc(c.name)}</strong><small>${plural(c.tasks.length, "task")}</small></span></label>`).join("");
-  $("#start-date").value = today(); $("#start-by").value = store.get("zr-name") || "";
+  $("#start-date").value = today();
   openSheet("#d-start");
 });
 $("#start-form").addEventListener("submit", async e => {
   e.preventDefault();
   const cl = S.checklists.find(c => c.id === new FormData(e.target).get("cl")); if (!cl) return;
-  const by = $("#start-by").value.trim(); if (by) store.set("zr-name", by);
+  const by = S.me?.name || "";
   const id = newId(); ui.open.add(id); $("#d-start").close();
   await save("set", "cleans", id, { type: cl.name, date: $("#start-date").value || today(), by, notes: "", createdAt: Date.now(), tasks: cl.tasks.map(t => ({ room: t.room, task: t.task, done: false })) }).catch(() => {});
   document.querySelector(`.changeover[data-id="${id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -397,14 +403,14 @@ function renderIssues() {
   $("#issue-chips").innerHTML = [["active", "Open"], ["in-progress", "In progress"], ["resolved", "Resolved"], ["all", "All"]]
     .map(([k, l]) => `<button class="chip" data-f="${k}" aria-pressed="${ui.issueFilter === k}">${l} <span class="c">${counts[k]}</span></button>`).join("");
   const list = S.issues.filter(i => ui.issueFilter === "all" || (ui.issueFilter === "active" ? i.status !== "resolved" : i.status === ui.issueFilter))
-    .sort((a, b) => (a.status === "resolved") - (b.status === "resolved") || (PRI[a.priority] ?? 1) - (PRI[b.priority] ?? 1) || (b.date || "").localeCompare(a.date || ""));
+    .sort((a, b) => (a.status === "resolved") - (b.status === "resolved") || (PRI[a.priority] ?? 1) - (PRI[b.priority] ?? 1) || (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0));
   const box = $("#issue-list");
   if (!list.length) { box.innerHTML = `<div class="card empty">${icon("check")}<p>${S.issues.length ? "Nothing here." : "<strong>No issues logged.</strong><br>Log anything that needs fixing, replacing or deciding."}</p></div>`; return; }
   box.innerHTML = list.map(i => `
     <article class="card issue p-${esc(i.priority)} s-${esc(i.status)}" data-id="${esc(i.id)}">
       <div class="in">
         <div><h3>${esc(i.title)}</h3>
-          <div class="meta">${i.room ? `<span>${esc(i.room)}</span><span>·</span>` : ""}<span class="tag ${i.priority === "high" ? "bad" : i.priority === "medium" ? "warn" : ""}">${esc(i.priority)} priority</span><span>· ${esc(fmtDate(i.date, { day: "numeric", month: "short" }))}</span>${i.resolved ? `<span class="tag good">Resolved ${esc(fmtDate(i.resolved, { day: "numeric", month: "short" }))}</span>` : ""}</div></div>
+          <div class="meta">${i.room ? `<span>${esc(i.room)}</span><span>·</span>` : ""}<span class="tag ${i.priority === "high" ? "bad" : i.priority === "medium" ? "warn" : ""}">${esc(i.priority)} priority</span><span>· ${esc(fmtDate(i.date, { day: "numeric", month: "short" }))}</span>${nameOf(i.createdBy) ? `<span>· by ${esc(nameOf(i.createdBy))}</span>` : ""}${i.private ? `<span class="tag private">${icon("lock", "icon")} Only you</span>` : ""}${i.resolved ? `<span class="tag good">Resolved ${esc(fmtDate(i.resolved, { day: "numeric", month: "short" }))}</span>` : ""}</div></div>
         ${i.notes ? `<p class="notes">${esc(i.notes)}</p>` : ""}
         <div class="photos">${(i.photos || []).map(p => thumb(p, i.title)).join("")}<label class="addphoto">${icon("camera")}<input type="file" accept="image/*" multiple data-addphoto aria-label="Add photos to ${esc(i.title)}"></label></div>
         <div class="row between">
@@ -431,6 +437,7 @@ $("#issue-list").addEventListener("change", async e => {
 let issueFiles = [];
 function openIssue() {
   $("#issue-form").reset(); $("#is-date").value = today(); segment($("#is-pri"), "medium"); issueFiles = []; $("#is-previews").innerHTML = "";
+  $("#is-private-row").hidden = !isOwner();
   openSheet("#d-issue"); $("#is-title").focus();
 }
 $("#open-issue").addEventListener("click", openIssue);
@@ -442,33 +449,141 @@ $("#issue-form").addEventListener("submit", async e => {
   try {
     const photos = [];
     if (issueFiles.length) { btn.textContent = "Uploading photos…"; for (const f of issueFiles) { try { photos.push(await uploadPhoto(f)); } catch (err) { toast(err.message); } } }
-    await save("set", "issues", newId(), { title: $("#is-title").value.trim(), room: $("#is-room").value.trim(), priority: $("#is-pri").dataset.value || "medium", date: $("#is-date").value || today(), notes: $("#is-notes").value.trim(), status: "open", resolved: "", photos, createdAt: Date.now() });
+    await save("set", "issues", newId(), { title: $("#is-title").value.trim(), room: $("#is-room").value.trim(), priority: $("#is-pri").dataset.value || "medium", date: $("#is-date").value || today(), notes: $("#is-notes").value.trim(), status: "open", resolved: "", photos, private: isOwner() && $("#is-private").checked, createdAt: Date.now() });
     $("#d-issue").close(); ui.issueFilter = "active"; renderIssues(); toast("Issue logged.");
   } catch {} finally { btn.disabled = false; btn.textContent = "Log issue"; }
+});
+
+/* ---------------- my list (owner only) ---------------- */
+const KINDS = { todo: "To do", take: "To take", remember: "Remember" };
+ui.mlFilter = "open";
+function renderMyList() {
+  const items = S.mylist;
+  const open = items.filter(x => !x.done), done = items.filter(x => x.done);
+  $("#ml-chips").innerHTML = [["open", "Open", open.length], ...Object.entries(KINDS).map(([k, l]) => [k, l, open.filter(x => x.kind === k).length]), ["done", "Done", done.length]]
+    .map(([k, l, n]) => `<button class="chip" data-f="${k}" aria-pressed="${ui.mlFilter === k}">${l} <span class="c">${n}</span></button>`).join("");
+  const list = ui.mlFilter === "done" ? done : open.filter(x => ui.mlFilter === "open" || x.kind === ui.mlFilter);
+  const box = $("#ml-list");
+  if (!list.length) { box.innerHTML = `<div class="card empty">${icon("pin")}<p>${items.length ? "Nothing here." : "<strong>Your private list is empty.</strong><br>Add reminders, jobs and things to take to the house. Only you can see them."}</p></div>`; return; }
+  const t = today(), soon = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+  const groups = ui.mlFilter === "done" ? [["Done", list.sort((a, b) => (b.doneAt || "").localeCompare(a.doneAt || ""))]] : [
+    ["Overdue", list.filter(x => x.due && x.due < t)],
+    ["Due this week", list.filter(x => x.due && x.due >= t && x.due <= soon)],
+    ["Later", list.filter(x => x.due && x.due > soon)],
+    ["No date", list.filter(x => !x.due)],
+  ].map(([g, l]) => [g, l.sort((a, b) => (a.due || "").localeCompare(b.due || "") || (a.createdAt || 0) - (b.createdAt || 0))]).filter(([, l]) => l.length);
+  box.innerHTML = groups.map(([g, l]) => `<section class="card room-card"><header><h3 style="${g === "Overdue" ? "color:var(--rust)" : ""}">${g}</h3><span class="muted" style="font-size:.85rem">${l.length}</span></header><div>${l.map(x => `
+    <div class="ml-item${x.done ? " done" : ""}" data-id="${esc(x.id)}">
+      <button class="box" data-toggle role="checkbox" aria-checked="${!!x.done}" aria-label="Done: ${esc(x.text)}">${icon("check")}</button>
+      <div><div class="t">${esc(x.text)}</div><div class="sub"><span class="tag">${esc(KINDS[x.kind] || "To do")}</span>${x.due ? `<span>${esc(fmtDate(x.due))}</span>` : ""}${x.done && x.doneAt ? `<span>Done ${esc(fmtTime(x.doneAt))}</span>` : ""}</div></div>
+      <button class="btn ghost small danger" data-del aria-label="Delete ${esc(x.text)}">${icon("trash")}</button>
+    </div>`).join("")}</div></section>`).join("");
+}
+segment($("#ml-kind"), "todo");
+$("#ml-form").addEventListener("submit", e => {
+  e.preventDefault(); const text = $("#ml-text").value.trim(); if (!text) return;
+  save("set", "mylist", newId(), { text, kind: $("#ml-kind").dataset.value || "todo", due: $("#ml-due").value || "", done: false, createdAt: Date.now() }).catch(() => {});
+  $("#ml-text").value = ""; $("#ml-due").value = ""; segment($("#ml-kind"), "todo"); $("#ml-text").focus();
+});
+$("#ml-chips").addEventListener("click", e => { const c = e.target.closest("[data-f]"); if (c) { ui.mlFilter = c.dataset.f; renderMyList(); } });
+$("#ml-list").addEventListener("click", e => {
+  const row = e.target.closest(".ml-item"); if (!row) return; const x = S.mylist.find(m => m.id === row.dataset.id); if (!x) return;
+  if (e.target.closest("[data-toggle]")) save("update", "mylist", x.id, { done: !x.done, doneAt: !x.done ? new Date().toISOString() : null }).catch(() => {});
+  if (e.target.closest("[data-del]") && confirm(`Delete “${x.text}”?`)) save("delete", "mylist", x.id).catch(() => {});
+});
+
+/* ---------------- account & people ---------------- */
+function renderMe() {
+  if (!S.me) return;
+  $("#me-name").textContent = S.me.name; $("#me-initial").textContent = S.me.name.slice(0, 1).toUpperCase();
+  $("#acc-name").textContent = S.me.name; $("#acc-role").textContent = isOwner() ? "Owner" : "Cleaner / helper";
+  $("#open-people").hidden = !isOwner(); $("#tab-mylist").hidden = !isOwner();
+}
+$("#open-account").addEventListener("click", () => { $("#pw-form").reset(); openSheet("#d-account"); });
+$("#pw-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  try { await api("/api/password", { method: "POST", body: { current: $("#pw-current").value, next: $("#pw-next").value } }); $("#pw-form").reset(); toast("Password changed. Other devices are now signed out."); }
+  catch (err) { toast(err.message); }
+});
+async function renderPeople() {
+  const box = $("#people-list");
+  try {
+    const { people } = await api("/api/people");
+    box.innerHTML = people.sort((a, b) => (a.role === "owner" ? 0 : 1) - (b.role === "owner" ? 0 : 1) || a.name.localeCompare(b.name)).map(p => `
+      <div class="person" data-id="${esc(p.id)}">
+        <span class="avatar">${esc(p.name.slice(0, 1).toUpperCase())}</span>
+        <span><strong>${esc(p.name)}</strong>${p.id === S.me.id ? " (you)" : ""}<small>${p.role === "owner" ? "Owner" : "Cleaner / helper"} · ${p.hasPassword ? "has signed in" : "hasn't chosen a password yet"}</small></span>
+        <span class="row" style="gap:4px">${p.id === S.me.id ? "" : `${p.hasPassword ? `<button class="btn ghost small" data-reset>Reset password</button>` : ""}<button class="btn ghost small danger" data-remove aria-label="Remove ${esc(p.name)}">${icon("trash")}</button>`}</span>
+      </div>`).join("");
+  } catch (err) { box.innerHTML = `<p class="muted" style="padding:12px">${esc(err.message)}</p>`; }
+}
+$("#open-people").addEventListener("click", () => { $("#d-account").close(); renderPeople(); openSheet("#d-people"); });
+$("#people-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  try { const { person } = await api("/api/people", { method: "POST", body: { op: "add", name: $("#pp-name").value, role: $("#pp-role").value } }); $("#people-form").reset(); toast(`Added ${person.name}. They choose a password the first time they sign in.`); renderPeople(); refresh().catch(() => {}); }
+  catch (err) { toast(err.message); }
+});
+$("#people-list").addEventListener("click", async e => {
+  const row = e.target.closest(".person"); if (!row) return; const name = row.querySelector("strong").textContent;
+  let op = null;
+  if (e.target.closest("[data-reset]") && confirm(`Reset ${name}'s password? They'll be signed out and choose a new one next time they sign in.`)) op = "reset";
+  if (e.target.closest("[data-remove]") && confirm(`Remove ${name}? They won't be able to sign in. Their name stays on things they did.`)) op = "remove";
+  if (!op) return;
+  try { await api("/api/people", { method: "POST", body: { op, id: row.dataset.id } }); toast(op === "reset" ? `${name}'s password was reset.` : `Removed ${name}.`); renderPeople(); }
+  catch (err) { toast(err.message); }
 });
 
 /* ---------------- boot ---------------- */
 function renderAll() {
   if (!loaded) return;
-  renderStats(); renderRooms();
+  renderMe(); renderStats(); renderRooms();
   safely($("#v-inventory"), renderInventory);
   safely($("#v-cleaning"), renderCleaning);
   safely($("#v-issues"), renderIssues);
+  if (isOwner()) safely($("#v-mylist"), renderMyList);
   if ($("#d-tpl").open) renderTpl();
+  route();
 }
-function showLogin() { $("#app").hidden = true; $("#login").hidden = false; setTimeout(() => $("#login-pw").focus(), 50); }
+
+// Sign-in screen: "login" (name + password), "choose" (first sign-in: pick a password), "setup" (create the owner account).
+let loginMode = "login";
+function setLoginMode(mode, note = "") {
+  loginMode = mode;
+  $("#f-app").hidden = mode !== "setup"; $("#f-pw").hidden = mode !== "login"; $("#f-new").hidden = mode === "login";
+  $("#login-name").readOnly = mode === "choose";
+  $("#f-new-label").textContent = mode === "setup" ? "Choose your password" : "Choose a password";
+  $("#login-btn").textContent = mode === "login" ? "Sign in" : mode === "setup" ? "Create owner account" : "Save password and sign in";
+  $("#login-back").hidden = mode !== "choose";
+  $("#login-note").hidden = !note; $("#login-note").textContent = note; $("#login-err").textContent = "";
+  setTimeout(() => (mode === "setup" ? $("#login-app") : mode === "choose" ? $("#login-new") : $("#login-name").value ? $("#login-pw") : $("#login-name")).focus(), 50);
+}
+async function showLogin() {
+  $("#app").hidden = true; $("#login").hidden = false; loaded = false;
+  $("#login-name").value = store.get("zr-name") || ""; $("#login-pw").value = ""; $("#login-new").value = "";
+  const r = await api("/api/login").catch(() => ({}));
+  if (r.needsSetup) setLoginMode("setup", "First time here: enter the app password from Vercel, then create your owner account.");
+  else setLoginMode("login");
+}
 async function showApp() {
   $("#login").hidden = true; $("#app").hidden = false; route();
   try { await refresh(); } catch (e) { if ($("#login").hidden) toast(e.message); }
 }
 document.querySelectorAll(".top, .login").forEach(el => el.prepend($("#strata-tpl").content.cloneNode(true)));
+$("#login-back").addEventListener("click", () => { $("#login-name").readOnly = false; setLoginMode("login"); $("#login-name").select(); });
 $("#login-form").addEventListener("submit", async e => {
   e.preventDefault(); $("#login-err").textContent = ""; const btn = $("#login-btn"); btn.disabled = true;
-  try { await api("/api/login", { method: "POST", body: { password: $("#login-pw").value } }); $("#login-pw").value = ""; showApp(); }
-  catch (err) { $("#login-err").textContent = err.message; }
+  const name = $("#login-name").value.trim();
+  const body = loginMode === "setup" ? { setup: true, appPassword: $("#login-app").value, name, password: $("#login-new").value }
+    : loginMode === "choose" ? { name, newPassword: $("#login-new").value } : { name, password: $("#login-pw").value };
+  try {
+    const r = await api("/api/login", { method: "POST", body });
+    if (r.needsPassword) { $("#login-name").value = r.name; setLoginMode("choose", `Welcome, ${r.name}. This is your first sign-in, so choose a password you'll use from now on.`); return; }
+    store.set("zr-name", r.me.name); $("#login-pw").value = ""; $("#login-new").value = ""; $("#login-app").value = "";
+    showApp();
+  } catch (err) { $("#login-err").textContent = err.message; }
   finally { btn.disabled = false; }
 });
-$("#signout").addEventListener("click", async () => { await api("/api/login", { method: "DELETE" }).catch(() => {}); loaded = false; showLogin(); });
+$("#signout").addEventListener("click", async () => { await api("/api/login", { method: "DELETE" }).catch(() => {}); $("#d-account").close(); showLogin(); });
 // Keep everyone's phones up to date.
 const anySheetOpen = () => $$("dialog").some(d => d.open);
 setInterval(() => { if (!document.hidden && loaded && !anySheetOpen()) refresh().catch(() => {}); }, 30000);

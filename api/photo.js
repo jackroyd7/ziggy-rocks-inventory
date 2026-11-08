@@ -4,7 +4,7 @@
 // DELETE ?url=: remove one.
 import { randomBytes } from "node:crypto";
 import { put, del } from "@vercel/blob";
-import { protect, json, isSignedIn } from "../lib/auth.js";
+import { protect, json, currentUser } from "../lib/auth.js";
 import { savePhoto, loadPhoto, removePhoto } from "../lib/store.js";
 
 const TYPES = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
@@ -33,7 +33,7 @@ export const POST = protect(async request => {
 });
 
 export async function GET(request) {
-  if (!isSignedIn(request)) return new Response("Sign in to see photos.", { status: 401 });
+  if (!(await currentUser(request))) return new Response("Sign in to see photos.", { status: 401 });
   const id = new URL(request.url).searchParams.get("id") || "";
   if (!ID.test(id)) return new Response("Not found", { status: 404 });
   const photo = await loadPhoto(id);
