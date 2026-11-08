@@ -86,10 +86,19 @@ td input:not([type="number"]), td select { width: 100%; }
 /* cleans */
 .progress { height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; }
 .progress > div { height: 100%; background: var(--accent); transition: width .2s; }
-.check { display: flex; gap: 12px; align-items: flex-start; padding: 7px 0; border-bottom: 1px dashed var(--line); }
-.check input { width: 20px; height: 20px; margin: 2px 0 0; flex: none; accent-color: var(--accent); }
+.check { display: flex; gap: 12px; align-items: flex-start; padding: 9px 0; border-bottom: 1px dashed var(--line); }
+.check input { width: 22px; height: 22px; margin: 1px 0 0; flex: none; accent-color: var(--accent); cursor: pointer; }
 .check label { flex: 1; cursor: pointer; }
 .check.done label { color: var(--muted); text-decoration: line-through; }
+.check .when { font-size: .8rem; color: var(--good); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.check.missed label { color: var(--bad); }
+.check.missed .when { color: var(--bad); font-weight: 700; }
+.roomhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.roomhead .count { font-size: .8rem; font-variant-numeric: tabular-nums; color: var(--muted); }
+.roomhead .count.open { color: var(--warn); font-weight: 700; }
+.missing { margin: 0; padding-left: 18px; color: var(--bad); font-size: .92rem; }
+.toggle { display: inline-flex; align-items: center; gap: 6px; font-size: .9rem; color: var(--muted); cursor: pointer; }
+.toggle input { accent-color: var(--accent); }
 .date { font: 600 1.05rem var(--display); }
 .pill { display: inline-block; padding: 1px 10px; border-radius: 99px; font-size: .8rem; font-weight: 700; background: var(--sand); }
 .pill.good { color: var(--good); } .pill.bad { color: var(--bad); } .pill.warn { color: var(--warn); } .pill.muted { color: var(--muted); }
@@ -502,30 +511,48 @@ $('#clean-new').addEventListener('click', async () => {
   $('#clean-by').value = '';
 });
 const cleanList = $('#clean-list');
+const outstandingOnly = new Set();
+const fmtTime = iso => { try { const d = new Date(iso); return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + (d.toDateString() === new Date().toDateString() ? '' : ' ' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })); } catch { return ''; } };
 function renderCleans() {
   if (!cleans) return;
-  if (!cleans.length) { cleanList.innerHTML = '<div class="card"><p class="empty">No changeovers recorded yet. Choose a checklist and date above to start one. Each keeps its own dated record.</p></div>'; return; }
+  if (!cleans.length) { cleanList.innerHTML = '<div class="card"><p class="empty">No changeovers recorded yet. Choose a checklist and date above and press Start checklist. You then get a tickbox for every task, and each tick is logged with the time.</p></div>'; return; }
   cleanList.innerHTML = cleans.map(c => {
-    const tasks = c.tasks || []; const done = tasks.filter(t => t.done).length; const pct = tasks.length ? Math.round(done / tasks.length * 100) : 0;
-    const open = openCleans.has(c.id);
+    const tasks = c.tasks || []; const done = tasks.filter(t => t.done).length; const left = tasks.length - done;
+    const pct = tasks.length ? Math.round(done / tasks.length * 100) : 0;
+    const finished = !!c.finishedAt;
+    const open = openCleans.has(c.id), only = outstandingOnly.has(c.id);
+    const pill = !left ? '<span class="pill good">All done</span>' : finished ? `<span class="pill bad">${left} missed</span>` : `<span class="pill warn">${left} to do</span>`;
+    const missing = tasks.filter(t => !t.done);
     const groups = groupBy(tasks.map((t, i) => ({ ...t, i })), 'room');
+    const body = Object.entries(groups).map(([room, ts]) => {
+      const rl = ts.filter(t => !t.done).length; const shown = only ? ts.filter(t => !t.done) : ts;
+      if (!shown.length) return '';
+      return `<div><div class="roomhead"><h3>${esc(room)}</h3><span class="count${rl ? ' open' : ''}">${ts.length - rl} of ${ts.length}</span></div>${shown.map(t => `
+        <div class="check${t.done ? ' done' : finished ? ' missed' : ''}"><input type="checkbox" id="t-${esc(c.id)}-${t.i}" data-i="${t.i}"${t.done ? ' checked' : ''}><label for="t-${esc(c.id)}-${t.i}">${esc(t.task)}</label>
+        ${t.done && t.doneAt ? `<span class="when">✓ ${esc(fmtTime(t.doneAt))}</span>` : !t.done && finished ? '<span class="when">Missed</span>' : ''}</div>`).join('')}</div>`;
+    }).join('');
     return `<div class="card" data-id="${esc(c.id)}">
       <div class="row spread">
-        <div class="row"><span class="date">${esc(fmtDate(c.date))}</span>${c.type ? `<span class="ctype">${esc(c.type)}</span>` : ''}${c.by ? `<span class="hint">${esc(c.by)}</span>` : ''}
-          <span class="pill ${pct === 100 ? 'good' : done ? 'warn' : 'muted'}">${pct === 100 ? 'Complete' : `${done} of ${tasks.length} done`}</span></div>
+        <div class="row"><span class="date">${esc(fmtDate(c.date))}</span>${c.type ? `<span class="ctype">${esc(c.type)}</span>` : ''}${c.by ? `<span class="hint">${esc(c.by)}</span>` : ''}${pill}</div>
         <div class="row"><button data-toggle aria-expanded="${open}">${open ? 'Hide tasks' : 'Show tasks'}</button><button class="quiet" data-del>Delete</button></div>
       </div>
-      <div class="progress"><div style="width:${pct}%"></div></div>
-      ${open ? Object.entries(groups).map(([room, ts]) => `<div><h3>${esc(room)}</h3>${ts.map(t => `
-        <div class="check${t.done ? ' done' : ''}"><input type="checkbox" id="t-${esc(c.id)}-${t.i}" data-i="${t.i}"${t.done ? ' checked' : ''}><label for="t-${esc(c.id)}-${t.i}">${esc(t.task)}</label></div>`).join('')}</div>`).join('') +
-        `<div><h3>Notes from this clean</h3><textarea id="notes-${esc(c.id)}" data-notes placeholder="Anything to report? Log damage or repairs in Issues too.">${esc(c.notes)}</textarea></div>` : (c.notes ? `<p class="hint">${esc(c.notes)}</p>` : '')}
+      <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><div style="width:${pct}%"></div></div>
+      ${open ? `<div class="row spread">
+          <label class="toggle"><input type="checkbox" data-only${only ? ' checked' : ''}> Show only tasks not done</label>
+          ${finished ? `<span class="hint">Finished ${esc(fmtTime(c.finishedAt))}</span> <button class="quiet" data-reopen>Reopen</button>` : `<button data-finish>Finish changeover</button>`}
+        </div>
+        ${body || '<p class="empty">Every task is ticked.</p>'}
+        <div><h3>Notes from this changeover</h3><textarea id="notes-${esc(c.id)}" data-notes placeholder="Anything to report? Log damage or repairs in Issues too.">${esc(c.notes)}</textarea></div>`
+      : `${missing.length && (finished || c.date < today()) ? `<div><h3>${finished ? 'Missed' : 'Not done yet'}</h3><ul class="missing">${missing.map(t => `<li>${esc(t.task)} <span class="hint">· ${esc(t.room)}</span></li>`).join('')}</ul></div>` : ''}${c.notes ? `<p class="hint">${esc(c.notes)}</p>` : ''}`}
     </div>`;
   }).join('');
 }
 cleanList.addEventListener('change', e => {
   const card = e.target.closest('[data-id]'); const c = cleans.find(x => x.id === card?.dataset.id); if (!c) return;
+  if (e.target.hasAttribute('data-only')) { e.target.checked ? outstandingOnly.add(c.id) : outstandingOnly.delete(c.id); renderCleans(); return; }
   if (e.target.dataset.i !== undefined) {
-    const tasks = c.tasks.map((t, i) => i === Number(e.target.dataset.i) ? { ...t, done: e.target.checked } : t);
+    const now = new Date().toISOString();
+    const tasks = c.tasks.map((t, i) => i === Number(e.target.dataset.i) ? { ...t, done: e.target.checked, doneAt: e.target.checked ? now : null } : t);
     c.tasks = tasks; renderCleans();
     write('cleans/' + c.id, () => db.doc('cleans/' + c.id).update({ tasks }));
   } else if (e.target.hasAttribute('data-notes')) {
@@ -535,6 +562,13 @@ cleanList.addEventListener('change', e => {
 cleanList.addEventListener('click', e => {
   const card = e.target.closest('[data-id]'); if (!card) return; const id = card.dataset.id;
   if (e.target.closest('[data-toggle]')) { openCleans.has(id) ? openCleans.delete(id) : openCleans.add(id); renderCleans(); }
+  if (e.target.closest('[data-finish]')) {
+    const c = cleans.find(x => x.id === id); const left = (c.tasks || []).filter(t => !t.done).length;
+    const go = () => write('cleans/' + id, () => db.doc('cleans/' + id).update({ finishedAt: new Date().toISOString() })).then(() => toast(left ? `Finished with ${left} task${left === 1 ? '' : 's'} missed.` : 'Changeover finished. Every task done.')).catch(() => {});
+    if (left) { const b = e.target.closest('[data-finish]'); if (b.dataset.sure) go(); else { b.dataset.sure = '1'; b.textContent = `Finish with ${left} not done?`; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = 'Finish changeover'; } }, 4000); } }
+    else go();
+  }
+  if (e.target.closest('[data-reopen]')) write('cleans/' + id, () => db.doc('cleans/' + id).update({ finishedAt: null })).catch(() => {});
   const del = e.target.closest('[data-del]'); if (del) armed(del, () => write('cleans/' + id, () => db.doc('cleans/' + id).delete()));
 });
 
@@ -658,7 +692,7 @@ function setWritable(on) {
   db.collection('cleans').orderBy('date', 'desc').onSnapshot(s => {
     const first = cleans === null;
     cleans = s.docs.map(d => ({ id: d.id, ...d.data() }));
-    if (first) { const live = cleans.find(x => (x.tasks || []).some(t => !t.done)); if (live) openCleans.add(live.id); }
+    if (first) { const live = cleans.find(x => !x.finishedAt && (x.tasks || []).some(t => !t.done)); if (live) openCleans.add(live.id); }
     safeRender(cleanList, renderCleans); done();
   }, fail);
   db.collection('issues').onSnapshot(s => { issues = s.docs.map(d => ({ id: d.id, ...d.data() })); safeRender(issueList, renderIssues); done(); }, fail);
