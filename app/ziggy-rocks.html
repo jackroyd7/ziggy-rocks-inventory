@@ -106,6 +106,10 @@ td input:not([type="number"]), td select { width: 100%; }
 .previews { display: flex; flex-wrap: wrap; gap: 8px; }
 .previews img { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; }
 
+.plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 12px; }
+.plan { display: grid; gap: 6px; padding: 8px; font-weight: 400; color: var(--muted); cursor: zoom-in; }
+.plan img { width: 100%; border-radius: 4px; background: #fff; }
+.ctype { font-size: .85rem; color: var(--muted); }
 #lightbox { position: fixed; inset: 0; background: rgb(0 0 0 / .85); display: grid; place-items: center; padding: 24px; z-index: 20; cursor: zoom-out; }
 #lightbox img { max-width: 100%; max-height: 100%; border-radius: 6px; }
 #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; z-index: 30; max-width: calc(100% - 32px); }
@@ -170,8 +174,9 @@ td input:not([type="number"]), td select { width: 100%; }
   <!-- CLEANING -->
   <section id="tab-cleaning" hidden>
     <div class="card">
-      <h2>Start a clean</h2>
+      <h2>Start a changeover</h2>
       <div class="row">
+        <select id="clean-type" class="grow" aria-label="Checklist"></select>
         <input id="clean-date" type="date" aria-label="Date of clean">
         <input id="clean-by" placeholder="Cleaned by" class="grow" aria-label="Cleaned by">
         <button class="primary" id="clean-new">Start checklist</button>
@@ -179,8 +184,18 @@ td input:not([type="number"]), td select { width: 100%; }
     </div>
     <div id="clean-list" style="display:grid;gap:16px"><p class="empty">Loading cleans…</p></div>
     <div class="card">
+      <details id="plans">
+        <summary><strong>Floor plans</strong> <span class="hint">· room names used in the checklists</span></summary>
+        <div class="plans">
+          <button class="plan" data-src="/_blob/0059f4ac4da4aefc6cad3f38612fae5a"><img src="/_blob/0059f4ac4da4aefc6cad3f38612fae5a" alt="Ground and first floor plan"><span>Ground and first floor</span></button>
+          <button class="plan" data-src="/_blob/a5ab404e0a46c4f649a0f633082cfbfd"><img src="/_blob/a5ab404e0a46c4f649a0f633082cfbfd" alt="Second and third floor plan"><span>Second and third floor</span></button>
+        </div>
+      </details>
+    </div>
+    <div class="card">
       <details id="tpl-details">
-        <summary><strong>Checklist template</strong> <span class="hint">· the tasks every new clean starts with</span></summary>
+        <summary><strong>Edit checklists</strong> <span class="hint">· the tasks each new changeover starts with</span></summary>
+        <div class="row" style="margin-top:12px"><select id="tpl-which" class="grow" aria-label="Checklist to edit"></select></div>
         <div id="tpl-list"></div>
         <form id="tpl-form" class="row" style="margin-top:12px">
           <input id="tpl-room" name="room" list="room-list" placeholder="Area" required class="grow" aria-label="Area">
@@ -235,17 +250,32 @@ const groupBy = (arr, key) => arr.reduce((m, x) => ((m[x[key] || 'Other'] ||= []
 const tid = () => Math.random().toString(36).slice(2, 10);
 const blobUrl = id => '/_blob/' + id;
 
-const DEFAULT_ROOMS = ['Kitchen', 'Living room', 'Dining area', 'Bedroom 1', 'Bedroom 2', 'Bathroom', 'Hallway', 'Utility', 'Garden'];
-const DEFAULT_TEMPLATE = {
-  'Kitchen': ['Empty and wipe fridge', 'Clean microwave inside and out', 'Wipe worktops and splashback', 'Clean hob and oven front', 'Empty dishwasher and put everything away', 'Clean sink and taps', 'Empty bins and fit new liners', 'Restock tea, coffee and washing-up liquid'],
-  'Bathroom': ['Clean toilet, seat and base', 'Clean shower or bath and screen', 'Clean basin, taps and mirror', 'Put out fresh towels and bath mat', 'Restock toilet roll, soap and shower gel', 'Mop floor'],
-  'Bedrooms': ['Strip and remake beds with fresh linen', 'Check drawers and under beds for left items', 'Dust surfaces', 'Hoover floor'],
-  'Living areas': ['Dust surfaces and TV', 'Plump cushions and fold throws', 'Hoover and mop floors', 'Check remotes work'],
-  'Before leaving': ['Check for damage or missing items and log them in Issues', 'Start or bag laundry', 'Take bins out', 'Heating and lights off', 'Windows closed and doors locked', 'Return keys'],
-};
+const DEFAULT_ROOMS = ['Kitchen', 'Living/dining room', 'Cinema room', 'Utility room', 'Boot room (dry room)', 'WC', 'Bedroom 1 (master)', 'Bedroom 2', 'Bedroom 3', 'Bedroom 4 (bunk room)', 'Main bathroom', 'Ensuites', 'Study / sofa bed', 'Balcony', 'Office', 'Outside', 'General'];
+// From "Ziggy owner to guest checklist".
+const DEFAULT_CHECKLISTS = [
+  { id: 'owner-to-guest', name: 'Owners leaving → guests arriving', rooms: {
+    'Kitchen': ['Empty the main kitchen fridge/freezer and move frozen food to the utility freezer', 'Leave condiments and non-perishables where they are in the cupboards'],
+    'Utility room': ['Check the washer-dryer is empty; fold dry owner clothes and towels neatly into the locked cupboard', 'Check the utility fridge/freezer holds owner items only', 'Check the sign telling guests the owner freezer is not for their use is up', 'Leave dog food, bed and belongings where they are'],
+    'Boot room (dry room)': ['Move all coats, boots and other belongings to the locked cupboard'],
+    'Bedroom 1 (master)': ['Strip owners’ linen; wash it in the office and keep it until guests leave', 'Put owners’ clothes away neatly in the locked cupboard', 'Move owners’ toiletries into baskets in the locked cupboard'],
+    'Bedroom 2': ['Strip owners’ linen; wash it in the office and keep it until guests leave', 'Put owners’ clothes away neatly in the locked cupboard', 'Move owners’ toiletries into baskets in the locked cupboard'],
+    'Bedroom 3': ['Strip owners’ linen; wash it in the office and keep it until guests leave', 'Put owners’ clothes away neatly in the locked cupboard', 'Move owners’ toiletries into baskets in the locked cupboard'],
+    'Bedroom 4 (bunk room)': ['Keep kids’ clothes in one set of drawers', 'Put kids’ toys away, indoor and outdoor'],
+    'Main bathroom': ['Move owners’ toiletries into baskets in the locked cupboard'],
+    'General': ['Empty every bin and take the rubbish out of the house'],
+    'Outside': ['Put away any toys left outside'],
+  } },
+  { id: 'guest-to-owner', name: 'Guests leaving → owners arriving', rooms: {
+    'Bedroom 1 (master)': ['Put owners’ linen back on the bed', 'Hang owners’ clothes back in the wardrobes (master bedroom only)'],
+    'Bedroom 2': ['Put owners’ linen back on the bed'],
+    'Bedroom 3': ['Put owners’ linen back on the bed'],
+    'Bathrooms': ['Put each bathroom’s owner toiletry basket back under the basin'],
+    'Utility room': ['Leave owners’ frozen food in the utility freezer for the owners to move'],
+  } },
+].map(c => ({ id: c.id, name: c.name, tasks: Object.entries(c.rooms).flatMap(([room, ts]) => ts.map(task => ({ id: tid(), room, task }))) }));
 
 let db = null, assets = null, sample = null, imageLimits = null;
-let inv = null, cleans = null, issues = null, template = null;
+let inv = null, cleans = null, issues = null, checklists = null;
 const openCleans = new Set();
 
 /* ---------- small UI helpers ---------- */
@@ -319,7 +349,7 @@ function renderSummary() {
     <span><b>${open.length}</b> open issue${open.length === 1 ? '' : 's'}${high ? ` · <b style="color:var(--bad)">${high} high</b>` : ''}</span>`;
 }
 function renderRooms() {
-  const rooms = new Set([...(inv || []).map(i => i.room), ...(template || []).map(t => t.room), ...DEFAULT_ROOMS].filter(Boolean));
+  const rooms = new Set([...(inv || []).map(i => i.room), ...(checklists || []).flatMap(c => c.tasks.map(t => t.room)), ...DEFAULT_ROOMS].filter(Boolean));
   $('#room-list').innerHTML = [...rooms].map(r => `<option value="${esc(r)}">`).join('');
 }
 
@@ -464,23 +494,24 @@ $('#scan-save').addEventListener('click', async () => {
 $('#clean-date').value = today();
 $('#clean-new').addEventListener('click', async () => {
   if (!db) return;
-  if (!template?.length) { toast('The checklist template is empty. Add tasks to it first.'); $('#tpl-details').open = true; return; }
+  const cl = (checklists || []).find(c => c.id === $('#clean-type').value);
+  if (!cl?.tasks.length) { toast('That checklist has no tasks yet. Add some under Edit checklists.'); $('#tpl-details').open = true; return; }
   const ref = db.collection('cleans').doc();
   openCleans.add(ref.id);
-  await ref.set({ date: $('#clean-date').value || today(), by: $('#clean-by').value.trim(), notes: '', createdAt: Date.now(), tasks: template.map(t => ({ room: t.room, task: t.task, done: false })) }).catch(e => toast(dbMessage(e)));
+  await ref.set({ date: $('#clean-date').value || today(), by: $('#clean-by').value.trim(), type: cl.name, notes: '', createdAt: Date.now(), tasks: cl.tasks.map(t => ({ room: t.room, task: t.task, done: false })) }).catch(e => toast(dbMessage(e)));
   $('#clean-by').value = '';
 });
 const cleanList = $('#clean-list');
 function renderCleans() {
   if (!cleans) return;
-  if (!cleans.length) { cleanList.innerHTML = '<div class="card"><p class="empty">No cleans recorded yet. Pick a date above and start a checklist. Each clean keeps its own dated record.</p></div>'; return; }
+  if (!cleans.length) { cleanList.innerHTML = '<div class="card"><p class="empty">No changeovers recorded yet. Choose a checklist and date above to start one. Each keeps its own dated record.</p></div>'; return; }
   cleanList.innerHTML = cleans.map(c => {
     const tasks = c.tasks || []; const done = tasks.filter(t => t.done).length; const pct = tasks.length ? Math.round(done / tasks.length * 100) : 0;
     const open = openCleans.has(c.id);
     const groups = groupBy(tasks.map((t, i) => ({ ...t, i })), 'room');
     return `<div class="card" data-id="${esc(c.id)}">
       <div class="row spread">
-        <div class="row"><span class="date">${esc(fmtDate(c.date))}</span>${c.by ? `<span class="hint">${esc(c.by)}</span>` : ''}
+        <div class="row"><span class="date">${esc(fmtDate(c.date))}</span>${c.type ? `<span class="ctype">${esc(c.type)}</span>` : ''}${c.by ? `<span class="hint">${esc(c.by)}</span>` : ''}
           <span class="pill ${pct === 100 ? 'good' : done ? 'warn' : 'muted'}">${pct === 100 ? 'Complete' : `${done} of ${tasks.length} done`}</span></div>
         <div class="row"><button data-toggle aria-expanded="${open}">${open ? 'Hide tasks' : 'Show tasks'}</button><button class="quiet" data-del>Delete</button></div>
       </div>
@@ -509,20 +540,31 @@ cleanList.addEventListener('click', e => {
 
 const tplList = $('#tpl-list');
 function renderTemplate() {
-  if (!template) return;
-  if (!template.length) { tplList.innerHTML = '<p class="empty">No tasks yet.</p><button id="tpl-default">Use a standard holiday-let checklist</button>'; return; }
-  tplList.innerHTML = Object.entries(groupBy(template, 'room')).map(([room, ts]) => `<h3>${esc(room)}</h3>` + ts.map(t =>
-    `<div class="check row spread" data-id="${esc(t.id)}"><span class="grow">${esc(t.task)}</span><button class="quiet" data-del>Remove</button></div>`).join('')).join('');
+  if (!checklists) return;
+  const opts = checklists.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+  for (const sel of ['#clean-type', '#tpl-which']) { const el = $(sel), v = el.value; el.innerHTML = opts; if (checklists.some(c => c.id === v)) el.value = v; }
+  if (!checklists.length) { tplList.innerHTML = '<p class="empty">No checklists yet.</p><button id="tpl-default">Load the owner and guest changeover checklists</button>'; return; }
+  const cl = checklists.find(c => c.id === $('#tpl-which').value) || checklists[0];
+  tplList.innerHTML = cl.tasks.length ? Object.entries(groupBy(cl.tasks, 'room')).map(([room, ts]) => `<h3>${esc(room)}</h3>` + ts.map(t =>
+    `<div class="check row spread" data-id="${esc(t.id)}"><span class="grow">${esc(t.task)}</span><button class="quiet" data-del>Remove</button></div>`).join('')).join('')
+    : '<p class="empty">No tasks in this checklist yet.</p>';
 }
-const saveTemplate = tasks => write('config/template', () => db.doc('config/template').set({ tasks }));
+$('#tpl-which').addEventListener('change', renderTemplate);
+const saveChecklists = list => write('config/template', () => db.doc('config/template').set({ checklists: list }));
+const editing = () => $('#tpl-which').value || checklists[0]?.id;
 tplList.addEventListener('click', e => {
-  if (e.target.id === 'tpl-default') saveTemplate(Object.entries(DEFAULT_TEMPLATE).flatMap(([room, ts]) => ts.map(task => ({ id: tid(), room, task }))));
-  if (e.target.closest('[data-del]')) { const id = e.target.closest('[data-id]').dataset.id; saveTemplate(template.filter(t => t.id !== id)); }
+  if (e.target.id === 'tpl-default') saveChecklists(DEFAULT_CHECKLISTS);
+  if (e.target.closest('[data-del]')) {
+    const id = e.target.closest('[data-id]').dataset.id;
+    saveChecklists(checklists.map(c => c.id === editing() ? { ...c, tasks: c.tasks.filter(t => t.id !== id) } : c));
+  }
 });
 $('#tpl-form').addEventListener('submit', e => {
-  e.preventDefault(); const room = $('#tpl-room').value.trim(), task = $('#tpl-task').value.trim(); if (!room || !task || !db) return;
-  saveTemplate([...(template || []), { id: tid(), room, task }]); $('#tpl-task').value = ''; $('#tpl-task').focus();
+  e.preventDefault(); const room = $('#tpl-room').value.trim(), task = $('#tpl-task').value.trim(); if (!room || !task || !db || !checklists.length) return;
+  saveChecklists(checklists.map(c => c.id === editing() ? { ...c, tasks: [...c.tasks, { id: tid(), room, task }] } : c));
+  $('#tpl-task').value = ''; $('#tpl-task').focus();
 });
+document.querySelectorAll('.plan').forEach(b => b.addEventListener('click', () => { const lb = $('#lightbox'); lb.querySelector('img').src = b.dataset.src; lb.hidden = false; }));
 
 /* ---------- issues ---------- */
 let issueFiles = [];
@@ -595,7 +637,7 @@ $('#issue-filter').addEventListener('change', renderIssues);
 /* ---------- boot ---------- */
 function setWritable(on) {
   for (const sel of ['#inv-form', '#tpl-form', '#issue-form']) $(sel).querySelectorAll('input,select,textarea,button').forEach(x => x.disabled = !on);
-  for (const sel of ['#clean-new', '#clean-date', '#clean-by', '#inv-checked']) $(sel).disabled = !on;
+  for (const sel of ['#clean-new', '#clean-type', '#clean-date', '#clean-by', '#inv-checked']) $(sel).disabled = !on;
 }
 (async () => {
   const c = window.claude;
@@ -610,7 +652,7 @@ function setWritable(on) {
   if (!assets) { $('#issue-photo-label').hidden = true; }
 
   const loadTimer = setTimeout(() => { if (!inv || !cleans || !issues) toast('Still connecting to the records. Your changes may not show yet.'); }, 10000);
-  const done = () => { if (inv && cleans && issues && template) clearTimeout(loadTimer); renderSummary(); };
+  const done = () => { if (inv && cleans && issues && checklists) clearTimeout(loadTimer); renderSummary(); };
   const fail = e => toast(e?.code === 'revoked' ? 'Access to these records has changed. Reload to continue.' : 'Could not load the records.');
   db.collection('inventory').onSnapshot(s => { inv = s.docs.map(d => ({ id: d.id, ...d.data() })); safeRender(invList, renderInventory); renderRooms(); done(); }, fail);
   db.collection('cleans').orderBy('date', 'desc').onSnapshot(s => {
@@ -620,6 +662,10 @@ function setWritable(on) {
     safeRender(cleanList, renderCleans); done();
   }, fail);
   db.collection('issues').onSnapshot(s => { issues = s.docs.map(d => ({ id: d.id, ...d.data() })); safeRender(issueList, renderIssues); done(); }, fail);
-  db.doc('config/template').onSnapshot(s => { template = s.exists ? (s.data().tasks || []) : []; safeRender(tplList, renderTemplate); renderRooms(); done(); }, fail);
+  db.doc('config/template').onSnapshot(s => {
+    const d = s.exists ? s.data() : {};
+    checklists = Array.isArray(d.checklists) ? d.checklists : Array.isArray(d.tasks) && d.tasks.length ? [{ id: 'cleaning', name: 'Cleaning', tasks: d.tasks }] : [];
+    safeRender(tplList, renderTemplate); renderRooms(); done();
+  }, fail);
 })();
 </script>
