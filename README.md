@@ -19,9 +19,11 @@ Everyone signs in with one shared password. There is no Claude account needed.
 1. In Vercel, choose **Add New → Project** and import this GitHub repository. Leave the framework as **Other**
    and the build settings empty.
 2. In the project's **Storage** tab, add:
-   - **Upstash for Redis** (from the Marketplace, free plan is fine) for the records.
+   - **Neon** (Postgres, from the Marketplace) for the records. Pick its free plan.
    - **Blob** for the photos.
-   Connect both to the project. Vercel adds their environment variables for you.
+   Connect both to the project. Vercel adds their environment variables for you
+   (`DATABASE_URL` for Neon, `BLOB_READ_WRITE_TOKEN` for Blob). The app creates its own table on first use.
+   Upstash for Redis also works instead of Neon, if you ever prefer it.
 3. In **Settings → Environment Variables**, add:
    - `APP_PASSWORD`: the password everyone will use to sign in.
    - `ANTHROPIC_API_KEY`: a Claude API key from https://platform.claude.com, used for photo scanning.
@@ -39,7 +41,7 @@ npm install
 APP_PASSWORD=test npm run dev
 ```
 
-Then open http://localhost:3000. Without the Redis variables, records are kept in memory until the server
+Then open http://localhost:3000. Without a database connected (`DATABASE_URL`, or the Upstash variables), records are kept in memory until the server
 stops; without `BLOB_READ_WRITE_TOKEN`, photos are kept inline. Photo scanning needs `ANTHROPIC_API_KEY`.
 
 ## Layout

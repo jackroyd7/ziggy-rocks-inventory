@@ -5,9 +5,12 @@
   "scripts": {
     "dev": "node dev-server.js"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
+    "@neondatabase/serverless": "^1.2.0",
     "@upstash/redis": "^1.41.0",
     "@vercel/blob": "^2.8.2"
   }
