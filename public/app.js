@@ -305,6 +305,7 @@ function coCard(c) {
       </div>
       ${rooms ? `<div class="rooms">${rooms}</div>` : `<div class="empty" style="padding:16px">${icon("check")}<p>Every task is ticked.</p></div>`}
       <label class="field"><span>Notes from this changeover</span><textarea data-notes placeholder="Anything to report? Log damage or repairs in Issues too.">${esc(c.notes)}</textarea></label>
+      <div class="field"><span>Comments</span>${commentsBlock(c, "cleans", c.type || "this changeover")}</div>
       <div class="row between">
         <button class="btn ghost danger small" data-del>${icon("trash")}Delete</button>
         ${finished ? "" : `<button class="btn primary" data-finish>${left ? "Finish changeover" : "Finish · all done"}</button>`}
@@ -316,7 +317,7 @@ function coCard(c) {
   return `<article class="card changeover" data-id="${esc(c.id)}">
     <div class="co-head" data-toggle role="button" tabindex="0" aria-expanded="${open}">
       ${ring(done, tasks.length, state)}
-      <div style="min-width:0"><h3>${esc(c.type || "Changeover")}</h3><div class="meta"><span>${esc(fmtDate(c.date, { weekday: "long", day: "numeric", month: "long" }))}</span>${c.by || nameOf(c.createdBy) ? `<span>· ${esc(c.by || nameOf(c.createdBy))}</span>` : ""}${status}</div></div>
+      <div style="min-width:0"><h3>${esc(c.type || "Changeover")}</h3><div class="meta"><span>${esc(fmtDate(c.date, { weekday: "long", day: "numeric", month: "long" }))}</span>${c.by || nameOf(c.createdBy) ? `<span>· ${esc(c.by || nameOf(c.createdBy))}</span>` : ""}${status}${(c.comments || []).length ? `<span class="tag">${icon("chat")} ${c.comments.length}</span>` : ""}</div></div>
       <span class="btn ghost small" aria-hidden="true">${open ? "Hide" : "Open"}</span>
     </div>
     ${body}${missing}
@@ -412,7 +413,7 @@ function renderIssues() {
         <div><h3>${esc(i.title)}</h3>
           <div class="meta">${i.room ? `<span>${esc(i.room)}</span><span>·</span>` : ""}<span class="tag ${i.priority === "high" ? "bad" : i.priority === "medium" ? "warn" : ""}">${esc(i.priority)} priority</span><span>· ${esc(fmtDate(i.date, { day: "numeric", month: "short" }))}</span>${nameOf(i.createdBy) ? `<span>· by ${esc(nameOf(i.createdBy))}</span>` : ""}${i.private ? `<span class="tag private">${icon("lock", "icon")} Only you</span>` : ""}${i.resolved ? `<span class="tag good">Resolved ${esc(fmtDate(i.resolved, { day: "numeric", month: "short" }))}</span>` : ""}</div></div>
         ${i.notes ? `<p class="notes">${esc(i.notes)}</p>` : ""}
-        ${commentsBlock(i)}
+        ${commentsBlock(i, "issues", i.title)}
         <div class="photos">${(i.photos || []).map(p => thumb(p, i.title)).join("")}<label class="addphoto">${icon("camera")}<input type="file" accept="image/*" multiple data-addphoto aria-label="Add photos to ${esc(i.title)}"></label></div>
         <div class="row between">
           <div class="seg" role="group" aria-label="Status">${STATUS.map(([v, l]) => `<button data-status="${v}" aria-pressed="${i.status === v}">${l}</button>`).join("")}</div>
@@ -421,36 +422,43 @@ function renderIssues() {
       </div>
     </article>`).join("");
 }
-function commentsBlock(i) {
-  const list = i.comments || []; const all = ui.allComments?.has(i.id); const shown = all ? list : list.slice(-3);
-  return `<div class="comments">
-    ${list.length > shown.length ? `<button class="btn ghost small" data-morecomments>Show all ${list.length} comments</button>` : ""}
+// Comment threads, used on issues and changeovers.
+function commentsBlock(rec, collection, label) {
+  const list = rec.comments || []; const key = collection + ":" + rec.id; const all = ui.allComments.has(key); const shown = all ? list : list.slice(-3);
+  return `<div class="comments" data-col="${collection}" data-rid="${esc(rec.id)}">
+    ${list.length > shown.length ? `<button type="button" class="btn ghost small" data-morecomments>Show all ${list.length} comments</button>` : ""}
     ${shown.map(c => `<div class="comment" data-cid="${esc(c.id)}"><span class="avatar sm">${esc((nameOf(c.by) || "?").slice(0, 1).toUpperCase())}</span>
-      <div><div class="who"><strong>${esc(nameOf(c.by) || "Someone")}</strong> <span class="muted">${esc(fmtTime(c.at))}</span>${c.by === S.me?.id || isOwner() ? `<button class="link-del" data-delcomment aria-label="Delete comment">Delete</button>` : ""}</div><p>${esc(c.text)}</p></div></div>`).join("")}
-    <form class="comment-form" data-commentform><input type="text" placeholder="Add a comment" aria-label="Add a comment to ${esc(i.title)}" maxlength="2000"><button class="btn small" aria-label="Post comment">${icon("send")}</button></form>
+      <div><div class="who"><strong>${esc(nameOf(c.by) || "Someone")}</strong> <span class="muted">${esc(fmtTime(c.at))}</span>${c.by === S.me?.id || isOwner() ? `<button type="button" class="link-del" data-delcomment aria-label="Delete comment">Delete</button>` : ""}</div><p>${esc(c.text)}</p></div></div>`).join("")}
+    <form class="comment-form" data-commentform><input type="text" placeholder="Add a comment" aria-label="Add a comment to ${esc(label)}" maxlength="2000"><button class="btn small" aria-label="Post comment">${icon("send")}</button></form>
   </div>`;
 }
 ui.allComments = new Set();
-$("#issue-list").addEventListener("submit", async e => {
+const commentTarget = el => { const box = el.closest(".comments"); return box && { box, collection: box.dataset.col, id: box.dataset.rid, rec: S[box.dataset.col]?.find(x => x.id === box.dataset.rid) }; };
+document.addEventListener("submit", async e => {
   if (!e.target.matches("[data-commentform]")) return; e.preventDefault();
-  const card = e.target.closest(".issue"); const input = e.target.querySelector("input"); const text = input.value.trim(); if (!text) return;
+  const t = commentTarget(e.target); if (!t?.rec) return;
+  const input = e.target.querySelector("input"); const text = input.value.trim(); if (!text) return;
   const btn = e.target.querySelector("button"); btn.disabled = true;
   try {
-    const { comment } = await api("/api/comment", { method: "POST", body: { issueId: card.dataset.id, text } });
-    const it = S.issues.find(x => x.id === card.dataset.id); if (it) it.comments = [...(it.comments || []), comment];
-    input.value = ""; input.blur(); renderIssues();
+    const { comment } = await api("/api/comment", { method: "POST", body: { collection: t.collection, id: t.id, text } });
+    t.rec.comments = [...(t.rec.comments || []), comment];
+    input.value = ""; input.blur(); renderAll();
   } catch (err) { toast(err.message); } finally { btn.disabled = false; }
+});
+document.addEventListener("click", e => {
+  const t = commentTarget(e.target); if (!t?.rec) return;
+  if (e.target.closest("[data-morecomments]")) { ui.allComments.add(t.collection + ":" + t.id); renderAll(); return; }
+  const dc = e.target.closest("[data-delcomment]");
+  if (dc) {
+    const cid = dc.closest("[data-cid]").dataset.cid; if (!confirm("Delete this comment?")) return;
+    api("/api/comment", { method: "POST", body: { collection: t.collection, id: t.id, remove: cid } })
+      .then(() => { t.rec.comments = (t.rec.comments || []).filter(c => c.id !== cid); renderAll(); }).catch(err => toast(err.message));
+  }
 });
 $("#issue-chips").addEventListener("click", e => { const c = e.target.closest("[data-f]"); if (c) { ui.issueFilter = c.dataset.f; renderIssues(); } });
 $("#issue-list").addEventListener("click", e => {
   const card = e.target.closest(".issue"); if (!card) return; const it = S.issues.find(i => i.id === card.dataset.id); if (!it) return;
-  if (e.target.closest("[data-morecomments]")) { ui.allComments.add(it.id); renderIssues(); return; }
-  const dc = e.target.closest("[data-delcomment]");
-  if (dc) {
-    const cid = dc.closest("[data-cid]").dataset.cid; if (!confirm("Delete this comment?")) return;
-    api("/api/comment", { method: "POST", body: { issueId: it.id, remove: cid } }).then(() => { it.comments = (it.comments || []).filter(c => c.id !== cid); renderIssues(); }).catch(err => toast(err.message));
-    return;
-  }
+  if (e.target.closest(".comments")) return;
   const st = e.target.closest("[data-status]");
   if (st && st.dataset.status !== it.status) save("update", "issues", it.id, { status: st.dataset.status, resolved: st.dataset.status === "resolved" ? today() : "" }).then(() => st.dataset.status === "resolved" && toast("Marked as resolved.")).catch(() => {});
   if (e.target.closest("[data-del]") && confirm(`Delete “${it.title}”?`)) { save("delete", "issues", it.id).catch(() => {}); (it.photos || []).forEach(deletePhoto); }

@@ -367,3 +367,5 @@ dialog.lightbox .btn { position: fixed; top: calc(12px + env(safe-area-inset-top
 .comment-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 .comment-form input { min-height: 40px; padding: 8px 12px; }
 .comment-form .btn { min-height: 40px; color: var(--accent); }
+.co-body .comments { border-top: 0; padding-top: 0; }
+.tag .icon { width: 13px; height: 13px; }
