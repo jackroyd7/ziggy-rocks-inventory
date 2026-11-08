@@ -18,12 +18,10 @@ Everyone signs in with one shared password. There is no Claude account needed.
 
 1. In Vercel, choose **Add New → Project** and import this GitHub repository. Leave the framework as **Other**
    and the build settings empty.
-2. In the project's **Storage** tab, add:
-   - **Neon** (Postgres, from the Marketplace) for the records. Pick its free plan.
-   - **Blob** for the photos.
-   Connect both to the project. Vercel adds their environment variables for you
-   (`DATABASE_URL` for Neon, `BLOB_READ_WRITE_TOKEN` for Blob). The app creates its own table on first use.
-   Upstash for Redis also works instead of Neon, if you ever prefer it.
+2. In the project's **Storage** tab, add **Neon** (Postgres, from the Marketplace) on its free plan and
+   connect it to the project. Vercel adds `DATABASE_URL` for you, and the app creates its own tables on first use.
+   Records and photos are both kept there.
+   Optional: if you later add a **Blob** store, new photos go there instead, which leaves more room in the database.
 3. In **Settings → Environment Variables**, add:
    - `APP_PASSWORD`: the password everyone will use to sign in.
    - `ANTHROPIC_API_KEY`: a Claude API key from https://platform.claude.com, used for photo scanning.
@@ -32,7 +30,7 @@ Everyone signs in with one shared password. There is no Claude account needed.
 On first load, the app adds the two changeover checklists and the open questions from the
 "Ziggy owner to guest checklist" doc as issues.
 
-Changing `APP_PASSWORD` signs everyone out. Photos are stored in Vercel Blob at long, unguessable public URLs.
+Changing `APP_PASSWORD` signs everyone out. Photos kept in the database are only shown to signed-in people. Photos in Vercel Blob (if you add it) sit at long, unguessable public URLs.
 
 ## Run it locally
 
@@ -42,7 +40,7 @@ APP_PASSWORD=test npm run dev
 ```
 
 Then open http://localhost:3000. Without a database connected (`DATABASE_URL`, or the Upstash variables), records are kept in memory until the server
-stops; without `BLOB_READ_WRITE_TOKEN`, photos are kept inline. Photo scanning needs `ANTHROPIC_API_KEY`.
+stops; photos are kept the same way. Photo scanning needs `ANTHROPIC_API_KEY`.
 
 ## Layout
 
