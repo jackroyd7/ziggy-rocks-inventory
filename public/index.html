@@ -5,15 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ziggy Rocks</title>
 <meta name="description" content="Inventory, changeover checklists and issue log for Ziggy Rocks, Cookswood.">
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#1c1c1e" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0b3f93" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a2557" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Ziggy Rocks">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/app.css?v=73387cd21">
+<link rel="stylesheet" href="/app.css?v=de3e531a">
 </head>
 <body>
 
@@ -46,9 +46,9 @@
       <button class="btn ghost small account-btn" id="open-account"><span class="avatar" id="me-initial">?</span><span id="me-name">Account</span></button>
     </div>
     <div class="wrap stats" id="stats">
-      <button class="stat" data-go="inventory"><span class="n" id="st-items">–</span><span class="l" id="st-items-l">items</span></button>
-      <button class="stat" data-go="cleaning"><span class="n" id="st-co">–</span><span class="l" id="st-co-l">changeover</span></button>
-      <button class="stat" data-go="issues" id="st-issues-tile"><span class="n" id="st-issues">–</span><span class="l" id="st-issues-l">open issues</span></button>
+      <button class="stat" data-go="inventory"><span class="ic"><svg class="icon"><use href="#i-box"/></svg></span><span class="n" id="st-items">–</span><span class="l" id="st-items-l">items</span></button>
+      <button class="stat" data-go="cleaning"><span class="ic"><svg class="icon"><use href="#i-list"/></svg></span><span class="n" id="st-co">–</span><span class="l" id="st-co-l">changeover</span></button>
+      <button class="stat" data-go="issues" id="st-issues-tile"><span class="ic"><svg class="icon"><use href="#i-alert"/></svg></span><span class="n" id="st-issues">–</span><span class="l" id="st-issues-l">open issues</span></button>
     </div>
   </header>
 
@@ -284,6 +284,6 @@
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
 </svg>
 
-<script src="/app.js?v=73387cd21" type="module"></script>
+<script src="/app.js?v=de3e531a" type="module"></script>
 </body>
 </html>
