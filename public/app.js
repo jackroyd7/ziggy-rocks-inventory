@@ -16,7 +16,7 @@ const COND = ["Good", "Fair", "Poor", "Missing"];
 const PRI = { high: 0, medium: 1, low: 2 };
 const STATUS = [["open", "Open"], ["in-progress", "In progress"], ["resolved", "Resolved"]];
 
-const S = { me: null, people: [], inventory: [], cleans: [], issues: [], checklists: [], mylist: [] };
+const S = { me: null, people: [], inventory: [], cleans: [], issues: [], checklists: [], mylist: [], settings: {} };
 const isOwner = () => S.me?.role === "owner";
 const nameOf = id => S.people.find(p => p.id === id)?.name || "";
 let loaded = false;
@@ -50,6 +50,7 @@ async function save(op, collection, id, data) {
     else if (op === "set") { const rec = { id, ...data }; i >= 0 ? (list[i] = rec) : list.push(rec); }
     else if (i >= 0) list[i] = { ...list[i], ...data };
   } else if (id === "template") S.checklists = data.checklists;
+  else if (id === "settings") S.settings = { ...data };
   renderAll();
   try { await api("/api/doc", { method: "POST", body: { op, collection, id, data } }); }
   catch (e) { toast(e.message); refresh().catch(() => {}); throw e; }
@@ -498,8 +499,30 @@ function renderMe() {
   $("#me-name").textContent = S.me.name; $("#me-initial").textContent = S.me.name.slice(0, 1).toUpperCase();
   $("#acc-name").textContent = S.me.name; $("#acc-role").textContent = isOwner() ? "Owner" : "Cleaner / helper";
   $("#open-people").hidden = !isOwner(); $("#tab-mylist").hidden = !isOwner();
+  const photo = S.settings?.headerPhoto, top = $(".top");
+  top.classList.toggle("has-photo", !!photo);
+  if (photo) { top.style.setProperty("--hdr-photo", `url("${photo.replace(/"/g, "%22")}")`); top.style.setProperty("--hdr-focus", (S.settings.headerFocus ?? 60) + "%"); }
+  else top.style.removeProperty("--hdr-photo");
+  $("#hdr-photo-box").hidden = !isOwner();
+  $("#hdr-photo-remove").hidden = !photo; $("#hdr-focus-row").hidden = !photo;
+  $("#hdr-photo-label").textContent = photo ? "Change photo" : "Choose photo";
+  if (document.activeElement !== $("#hdr-focus")) $("#hdr-focus").value = S.settings?.headerFocus ?? 60;
 }
+const saveSettings = patch => save("set", "config", "settings", { ...S.settings, ...patch });
 $("#open-account").addEventListener("click", () => { $("#pw-form").reset(); openSheet("#d-account"); });
+$("#hdr-photo").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  $("#hdr-photo-label").textContent = "Uploading…";
+  try { const old = S.settings?.headerPhoto; const url = await uploadPhoto(f); await saveSettings({ headerPhoto: url, headerFocus: 60 }); if (old) deletePhoto(old); toast("Header photo updated."); }
+  catch (err) { toast(err.message); renderMe(); }
+  e.target.value = "";
+});
+$("#hdr-photo-remove").addEventListener("click", async () => {
+  const old = S.settings?.headerPhoto; if (!old || !confirm("Remove the header photo?")) return;
+  await saveSettings({ headerPhoto: null }).catch(() => {}); deletePhoto(old);
+});
+$("#hdr-focus").addEventListener("input", e => $(".top").style.setProperty("--hdr-focus", e.target.value + "%"));
+$("#hdr-focus").addEventListener("change", e => saveSettings({ headerFocus: Number(e.target.value) }).catch(() => {}));
 $("#pw-form").addEventListener("submit", async e => {
   e.preventDefault();
   try { await api("/api/password", { method: "POST", body: { current: $("#pw-current").value, next: $("#pw-next").value } }); $("#pw-form").reset(); toast("Password changed. Other devices are now signed out."); }

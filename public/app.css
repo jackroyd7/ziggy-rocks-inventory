@@ -1,4 +1,4 @@
-/* Layout: phone-first single column. A plain white header with the three key figures, tabs that sit at the bottom on phones and under the header on desktop,
+/* Layout: phone-first single column. A deep blue header with the three key figures, tabs that sit at the bottom on phones and under the header on desktop,
    and forms that open as sheets. */
 :root {
   --bg: #f2f2f7; --surface: #ffffff; --sunk: #e9e9ef; --ink: #1c1c1e; --muted: #6c6c72; --line: #dcdce2;
@@ -294,3 +294,50 @@ dialog.lightbox .btn { position: fixed; top: calc(12px + env(safe-area-inset-top
 .ml-item .sub { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 4px; font-size: .82rem; color: var(--muted); }
 .tag.private { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink); }
 @media (max-width: 720px) { .account-btn #me-name { max-width: 9ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
+
+/* ---------- section colours and the blue header ---------- */
+:root {
+  --c-inv: #0b52bf; --c-co: #0f8a7e; --c-is: #d9622b; --c-ml: #7a4fc4;
+  --hdr-a: #0b3f93; --hdr-b: #0b52bf;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --c-inv: #5a9cff; --c-co: #3cc4b4; --c-is: #ff8f5c; --c-ml: #b48cff; --hdr-a: #0a2557; --hdr-b: #0d3f8f; }
+}
+.top { background: linear-gradient(160deg, var(--hdr-a) 0%, var(--hdr-b) 100%); border-bottom: 0; color: #fff; }
+.top::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(rgb(255 255 255 / .10) 1.2px, transparent 1.3px); background-size: 18px 18px;
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent 85%); mask-image: linear-gradient(to bottom, #000, transparent 85%); }
+.top-inner, .stats { z-index: 1; }
+.top .eyebrow { color: rgb(255 255 255 / .72); }
+.top h1 { color: #fff; }
+.top .account-btn { color: #fff; }
+.top .account-btn:hover { background: rgb(255 255 255 / .12); }
+.top .avatar { background: #fff; color: var(--hdr-a); }
+.stat { background: rgb(255 255 255 / .12); border-color: rgb(255 255 255 / .18); color: #fff; }
+.stat:hover { border-color: rgb(255 255 255 / .5); }
+.stat .l { color: rgb(255 255 255 / .8); }
+.stat.warn .n { color: #ffd2c9; }
+.stat .ic { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; margin-bottom: 6px; background: rgb(255 255 255 / .16); }
+.stat .ic .icon { width: 18px; height: 18px; }
+@media (hover: none) { .top .account-btn:hover { background: none; } .stat:hover { border-color: rgb(255 255 255 / .18); } }
+
+/* each section's own colour: tab icons, the active tab, and the controls inside it */
+.tabs a[data-tab="inventory"] { --sec: var(--c-inv); }
+.tabs a[data-tab="cleaning"] { --sec: var(--c-co); }
+.tabs a[data-tab="issues"] { --sec: var(--c-is); }
+.tabs a[data-tab="mylist"] { --sec: var(--c-ml); }
+.tabs a .icon { color: var(--sec); }
+.tabs a[aria-current="page"] { color: var(--sec); background: color-mix(in srgb, var(--sec) 13%, transparent); }
+#v-inventory { --accent: var(--c-inv); }
+#v-cleaning, #d-start, #d-tpl { --accent: var(--c-co); --accent-soft: color-mix(in srgb, var(--c-co) 14%, transparent); }
+#v-issues, #d-issue, .fab { --accent: var(--c-is); --accent-soft: color-mix(in srgb, var(--c-is) 14%, transparent); }
+#v-mylist { --accent: var(--c-ml); --accent-soft: color-mix(in srgb, var(--c-ml) 14%, transparent); }
+.room-head h4::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--accent); margin-right: 8px; vertical-align: 1px; }
+.card { box-shadow: 0 1px 2px rgb(16 24 40 / .05), 0 10px 24px -12px rgb(16 24 40 / .18); }
+@media (prefers-color-scheme: dark) { .card { box-shadow: none; } }
+
+/* optional photo behind the header, darkened so the text stays readable */
+.top.has-photo { background-image: linear-gradient(180deg, rgb(6 14 32 / .62) 0%, rgb(6 14 32 / .30) 42%, rgb(6 14 32 / .55) 100%), var(--hdr-photo); background-size: cover; background-position: center var(--hdr-focus, 60%); }
+.top.has-photo::after { display: none; }
+.top.has-photo .stat { background: rgb(8 18 40 / .42); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.top.has-photo h1, .top.has-photo .eyebrow { text-shadow: 0 1px 12px rgb(0 0 0 / .35); }

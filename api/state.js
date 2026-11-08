@@ -4,8 +4,8 @@ import { list, get, ensureSeeded } from "../lib/store.js";
 export const GET = protect(async (request, me) => {
   await ensureSeeded();
   const owner = me.role === "owner";
-  const [inventory, cleans, issues, template, people, mylist] = await Promise.all([
-    list("inventory"), list("cleans"), list("issues"), get("config", "template"), list("users"), owner ? list("mylist") : [],
+  const [inventory, cleans, issues, template, people, mylist, settings] = await Promise.all([
+    list("inventory"), list("cleans"), list("issues"), get("config", "template"), list("users"), owner ? list("mylist") : [], get("config", "settings"),
   ]);
   return json({
     me: publicUser(me),
@@ -15,5 +15,6 @@ export const GET = protect(async (request, me) => {
     issues: issues.filter(i => !i.private || i.createdBy === me.id),
     checklists: template?.checklists || [],
     mylist,
+    settings: { headerPhoto: settings?.headerPhoto || null, headerFocus: settings?.headerFocus ?? 60 },
   });
 });
