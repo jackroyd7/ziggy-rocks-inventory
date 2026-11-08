@@ -1,0 +1,625 @@
+<title>Ziggy Rocks</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap">
+<style>
+/* Layout: a single working column, tabs under a compact property header; cards only for forms and dated cleans. */
+:root {
+  --bg: #f3f5f4; --surface: #ffffff; --ink: #17211f; --muted: #5d6b68; --line: #dbe2e0;
+  --accent: #1d6672; --accent-ink: #ffffff; --sand: #efe6d6;
+  --bad: #b23a2b; --warn: #9a6208; --good: #2e7d4f;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101615; --surface: #18201f; --ink: #e6ecea; --muted: #95a39f; --line: #2a3533;
+    --accent: #5cb3bf; --accent-ink: #0b1617; --sand: #2e2b22;
+    --bad: #ec7a69; --warn: #e3a94a; --good: #6cc28c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101615; --surface: #18201f; --ink: #e6ecea; --muted: #95a39f; --line: #2a3533;
+  --accent: #5cb3bf; --accent-ink: #0b1617; --sand: #2e2b22;
+  --bad: #ec7a69; --warn: #e3a94a; --good: #6cc28c; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); }
+.wrap { max-width: 920px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header.wrap { padding-block: 24px 0; }
+h1 { font: 800 2rem/1.1 var(--display); margin: 0; letter-spacing: -0.01em; }
+h2 { font: 600 1.15rem/1.3 var(--display); margin: 0; text-wrap: balance; }
+h3 { font: 700 .75rem/1.2 var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 18px 0 6px; }
+.summary { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 16px; color: var(--muted); font-size: .92rem; }
+.summary b { color: var(--ink); font-variant-numeric: tabular-nums; }
+nav { display: flex; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+nav a { padding: 10px 14px; color: var(--muted); text-decoration: none; border-bottom: 3px solid transparent; white-space: nowrap; font-weight: 700; }
+nav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+main.wrap { padding-block: 18px 48px; display: grid; gap: 16px; }
+section { display: grid; gap: 16px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.spread { justify-content: space-between; }
+.grow { flex: 1 1 160px; min-width: 0; }
+.hint { color: var(--muted); font-size: .9rem; margin: 0; }
+input, select, textarea { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-width: 0; }
+textarea { width: 100%; min-height: 64px; resize: vertical; }
+input[type="number"] { width: 72px; font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button { font: inherit; cursor: pointer; border-radius: 6px; padding: 8px 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-weight: 700; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button.quiet { border-color: transparent; background: none; color: var(--muted); padding: 4px 8px; font-weight: 400; }
+button.quiet:hover { color: var(--bad); }
+button[data-armed] { color: var(--bad); border-color: var(--bad); }
+button:disabled { opacity: .55; cursor: default; }
+.file { position: relative; display: inline-flex; align-items: center; gap: 6px; border: 1px dashed var(--muted); border-radius: 6px; padding: 8px 14px; cursor: pointer; font-weight: 700; }
+.file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.empty { color: var(--muted); padding: 8px 0; margin: 0; }
+.notice { background: var(--sand); border-radius: 8px; padding: 10px 14px; margin: 0; }
+
+/* inventory */
+.tbl { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 6px; border-bottom: 1px solid var(--line); }
+td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+td input:not([type="number"]), td select { width: 100%; }
+.thumb { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; display: block; background: var(--sand); border: 0; padding: 0; cursor: zoom-in; }
+.thumb-empty { width: 44px; height: 44px; border-radius: 6px; background: var(--sand); }
+.cond-Poor, .cond-Missing { color: var(--bad); font-weight: 700; }
+.cond-Fair { color: var(--warn); font-weight: 700; }
+@media (max-width: 640px) {
+  .stack thead { display: none; }
+  .stack tr { display: grid; grid-template-columns: 44px 1fr 72px; gap: 6px 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .stack td { border: 0; padding: 0; }
+  .stack td.c-item { grid-column: 2; } .stack td.c-qty { grid-column: 3; }
+  .stack td.c-photo { grid-row: span 2; }
+  .stack td.c-cond, .stack td.c-notes, .stack td.c-check { grid-column: 2 / 4; }
+  .stack td.c-del { grid-column: 3; justify-self: end; }
+}
+.scan-rows { display: grid; gap: 6px; }
+.scan-row { display: grid; grid-template-columns: auto 1fr 72px 110px; gap: 8px; align-items: center; }
+.scan-row .note { grid-column: 2 / 5; color: var(--muted); font-size: .85rem; margin-top: -4px; }
+@media (max-width: 520px) { .scan-row { grid-template-columns: auto 1fr 72px; } .scan-row select { grid-column: 2 / 4; } .scan-row .note { grid-column: 2 / 4; } }
+.status { font-size: .92rem; color: var(--muted); margin: 0; }
+
+/* cleans */
+.progress { height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; }
+.progress > div { height: 100%; background: var(--accent); transition: width .2s; }
+.check { display: flex; gap: 12px; align-items: flex-start; padding: 7px 0; border-bottom: 1px dashed var(--line); }
+.check input { width: 20px; height: 20px; margin: 2px 0 0; flex: none; accent-color: var(--accent); }
+.check label { flex: 1; cursor: pointer; }
+.check.done label { color: var(--muted); text-decoration: line-through; }
+.date { font: 600 1.05rem var(--display); }
+.pill { display: inline-block; padding: 1px 10px; border-radius: 99px; font-size: .8rem; font-weight: 700; background: var(--sand); }
+.pill.good { color: var(--good); } .pill.bad { color: var(--bad); } .pill.warn { color: var(--warn); } .pill.muted { color: var(--muted); }
+
+/* issues */
+.issue { display: grid; grid-template-columns: 4px 1fr; gap: 0 14px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.issue::before { content: ""; border-radius: 4px; background: var(--line); grid-row: span 3; }
+.issue.p-high::before { background: var(--bad); } .issue.p-medium::before { background: var(--warn); }
+.issue.resolved { opacity: .7; } .issue.resolved::before { background: var(--good); }
+.issue .meta { color: var(--muted); font-size: .88rem; }
+.issue p { margin: 4px 0 0; white-space: pre-wrap; }
+.photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.photos .thumb { width: 72px; height: 72px; }
+.previews { display: flex; flex-wrap: wrap; gap: 8px; }
+.previews img { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; }
+
+#lightbox { position: fixed; inset: 0; background: rgb(0 0 0 / .85); display: grid; place-items: center; padding: 24px; z-index: 20; cursor: zoom-out; }
+#lightbox img { max-width: 100%; max-height: 100%; border-radius: 6px; }
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; z-index: 30; max-width: calc(100% - 32px); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="wrap">
+  <h1>Ziggy Rocks</h1>
+  <div class="summary" id="summary"><span>Connecting…</span></div>
+  <nav>
+    <a href="#inventory" data-tab="inventory">Inventory</a>
+    <a href="#cleaning" data-tab="cleaning">Cleaning</a>
+    <a href="#issues" data-tab="issues">Issues</a>
+  </nav>
+</header>
+
+<main class="wrap">
+  <p class="notice" id="offline" hidden>This page saves to a shared database. Open it in Claude, signed in, to see and edit the records.</p>
+
+  <!-- INVENTORY -->
+  <section id="tab-inventory">
+    <div class="card" id="scan-card">
+      <div>
+        <h2>Add items from photos</h2>
+        <p class="hint">Photograph a cupboard, drawer or room. Claude lists and counts what it sees, and you check the list before anything is saved.</p>
+      </div>
+      <div class="row">
+        <input id="scan-room" list="room-list" placeholder="Room, e.g. Kitchen" class="grow" aria-label="Room">
+        <label class="file">Choose photos<input id="scan-files" type="file" accept="image/*" multiple></label>
+        <button class="primary" id="scan-go" disabled>Identify items</button>
+        <button id="scan-stop" hidden>Stop</button>
+      </div>
+      <div class="previews" id="scan-previews"></div>
+      <p class="status" id="scan-status" hidden></p>
+      <div id="scan-result" hidden>
+        <div class="scan-rows" id="scan-rows"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="primary" id="scan-save">Add to inventory</button>
+          <button id="scan-cancel">Discard</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Add an item by hand</h2>
+      <form id="inv-form" class="row">
+        <input id="inv-room" name="room" list="room-list" placeholder="Room" required class="grow" aria-label="Room">
+        <input id="inv-item" name="item" placeholder="Item" required class="grow" aria-label="Item">
+        <input id="inv-qty" name="qty" type="number" min="0" value="1" aria-label="Quantity">
+        <select id="inv-cond" name="condition" aria-label="Condition"><option>Good</option><option>Fair</option><option>Poor</option><option>Missing</option></select>
+        <button class="primary">Add</button>
+      </form>
+    </div>
+
+    <div class="row spread">
+      <input id="inv-search" type="search" placeholder="Search items" class="grow" aria-label="Search items">
+      <button id="inv-checked">Mark all checked today</button>
+    </div>
+    <div id="inv-list"><p class="empty">Loading inventory…</p></div>
+  </section>
+
+  <!-- CLEANING -->
+  <section id="tab-cleaning" hidden>
+    <div class="card">
+      <h2>Start a clean</h2>
+      <div class="row">
+        <input id="clean-date" type="date" aria-label="Date of clean">
+        <input id="clean-by" placeholder="Cleaned by" class="grow" aria-label="Cleaned by">
+        <button class="primary" id="clean-new">Start checklist</button>
+      </div>
+    </div>
+    <div id="clean-list" style="display:grid;gap:16px"><p class="empty">Loading cleans…</p></div>
+    <div class="card">
+      <details id="tpl-details">
+        <summary><strong>Checklist template</strong> <span class="hint">· the tasks every new clean starts with</span></summary>
+        <div id="tpl-list"></div>
+        <form id="tpl-form" class="row" style="margin-top:12px">
+          <input id="tpl-room" name="room" list="room-list" placeholder="Area" required class="grow" aria-label="Area">
+          <input id="tpl-task" name="task" placeholder="Task" required class="grow" aria-label="Task">
+          <button>Add task</button>
+        </form>
+      </details>
+    </div>
+  </section>
+
+  <!-- ISSUES -->
+  <section id="tab-issues" hidden>
+    <div class="card">
+      <h2>Log an issue</h2>
+      <form id="issue-form" style="display:grid;gap:10px">
+        <div class="row">
+          <input id="issue-title" name="title" placeholder="What needs sorting?" required class="grow" aria-label="Issue">
+          <input id="issue-room" name="room" list="room-list" placeholder="Room" class="grow" aria-label="Room">
+        </div>
+        <div class="row">
+          <select id="issue-priority" name="priority" aria-label="Priority">
+            <option value="high">High priority</option><option value="medium" selected>Medium priority</option><option value="low">Low priority</option>
+          </select>
+          <input id="issue-date" name="date" type="date" aria-label="Date reported">
+          <label class="file" id="issue-photo-label">Add photos<input id="issue-files" type="file" accept="image/*" multiple></label>
+        </div>
+        <div class="previews" id="issue-previews"></div>
+        <textarea id="issue-notes" name="notes" placeholder="Details, e.g. what happened, who reported it"></textarea>
+        <div class="row"><button class="primary" id="issue-submit">Log issue</button></div>
+      </form>
+    </div>
+    <div class="row spread">
+      <h2>Issues</h2>
+      <select id="issue-filter" aria-label="Show">
+        <option value="active">Open and in progress</option><option value="resolved">Resolved</option><option value="all">All</option>
+      </select>
+    </div>
+    <div id="issue-list"><p class="empty">Loading issues…</p></div>
+  </section>
+</main>
+
+<datalist id="room-list"></datalist>
+<div id="lightbox" hidden><img alt=""></div>
+<div id="toast" hidden role="status"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const fmtDate = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '';
+const groupBy = (arr, key) => arr.reduce((m, x) => ((m[x[key] || 'Other'] ||= []).push(x), m), {});
+const tid = () => Math.random().toString(36).slice(2, 10);
+const blobUrl = id => '/_blob/' + id;
+
+const DEFAULT_ROOMS = ['Kitchen', 'Living room', 'Dining area', 'Bedroom 1', 'Bedroom 2', 'Bathroom', 'Hallway', 'Utility', 'Garden'];
+const DEFAULT_TEMPLATE = {
+  'Kitchen': ['Empty and wipe fridge', 'Clean microwave inside and out', 'Wipe worktops and splashback', 'Clean hob and oven front', 'Empty dishwasher and put everything away', 'Clean sink and taps', 'Empty bins and fit new liners', 'Restock tea, coffee and washing-up liquid'],
+  'Bathroom': ['Clean toilet, seat and base', 'Clean shower or bath and screen', 'Clean basin, taps and mirror', 'Put out fresh towels and bath mat', 'Restock toilet roll, soap and shower gel', 'Mop floor'],
+  'Bedrooms': ['Strip and remake beds with fresh linen', 'Check drawers and under beds for left items', 'Dust surfaces', 'Hoover floor'],
+  'Living areas': ['Dust surfaces and TV', 'Plump cushions and fold throws', 'Hoover and mop floors', 'Check remotes work'],
+  'Before leaving': ['Check for damage or missing items and log them in Issues', 'Start or bag laundry', 'Take bins out', 'Heating and lights off', 'Windows closed and doors locked', 'Return keys'],
+};
+
+let db = null, assets = null, sample = null, imageLimits = null;
+let inv = null, cleans = null, issues = null, template = null;
+const openCleans = new Set();
+
+/* ---------- small UI helpers ---------- */
+let toastTimer;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 4000); }
+function dbMessage(e) {
+  if (e?.code === 'invalid_argument') return 'You can view this page but not change it. Ask the owner for Contributor access.';
+  if (e?.code === 'quota_exceeded') return 'The database is full. Delete some old cleans or issues.';
+  return 'That change did not save. Check your connection and try again.';
+}
+// One write at a time per document.
+const queues = new Map();
+function write(path, op) {
+  const next = (queues.get(path) || Promise.resolve()).catch(() => {}).then(op);
+  queues.set(path, next);
+  return next.catch(e => { toast(dbMessage(e)); throw e; });
+}
+// Two-step delete: first click arms the button, second click within 3 s confirms.
+function armed(btn, action) {
+  if (btn.dataset.armed) { delete btn.dataset.armed; action(); return; }
+  const label = btn.textContent; btn.dataset.armed = '1'; btn.textContent = 'Confirm delete';
+  setTimeout(() => { if (btn.isConnected && btn.dataset.armed) { delete btn.dataset.armed; btn.textContent = label; } }, 3000);
+}
+// Don't re-render a list while someone is typing in it; catch up when they leave it.
+const deferred = new Set();
+function safeRender(container, fn) {
+  const a = document.activeElement;
+  if (a && container.contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && a.type !== 'checkbox') { deferred.add(fn); return; }
+  fn();
+}
+document.addEventListener('focusout', () => setTimeout(() => { const fns = [...deferred]; deferred.clear(); fns.forEach(f => safeRender(document.body, f)); }, 0));
+
+async function shrink(file, max = 1600) {
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const s = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise(r => c.toBlob(b => r(b || file), 'image/jpeg', 0.82));
+  } catch { return file; }
+}
+async function uploadPhoto(file) {
+  const r = await assets.upload(await shrink(file), { type: 'image/jpeg' });
+  return r.id;
+}
+function showPhoto(id) { const lb = $('#lightbox'); lb.querySelector('img').src = blobUrl(id); lb.hidden = false; }
+$('#lightbox').onclick = () => $('#lightbox').hidden = true;
+document.addEventListener('click', e => { const t = e.target.closest('[data-photo]'); if (t) showPhoto(t.dataset.photo); });
+function previews(files, el) {
+  el.innerHTML = ''; for (const f of files) { const img = document.createElement('img'); img.src = URL.createObjectURL(f); img.alt = ''; el.append(img); }
+}
+
+/* ---------- tabs (hash routed) ---------- */
+function route() {
+  const tab = ['inventory', 'cleaning', 'issues'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'inventory';
+  document.querySelectorAll('nav a').forEach(a => { if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  for (const t of ['inventory', 'cleaning', 'issues']) $('#tab-' + t).hidden = t !== tab;
+}
+addEventListener('hashchange', route); route();
+
+/* ---------- summary + rooms ---------- */
+function renderSummary() {
+  if (!inv || !cleans || !issues) return;
+  const total = inv.reduce((n, i) => n + (Number(i.qty) || 0), 0);
+  const last = cleans[0];
+  const open = issues.filter(i => i.status !== 'resolved');
+  const high = open.filter(i => i.priority === 'high').length;
+  $('#summary').innerHTML = `
+    <span><b>${inv.length}</b> inventory lines (${total} items)</span>
+    <span>Last clean <b>${last ? esc(fmtDate(last.date)) : 'none yet'}</b></span>
+    <span><b>${open.length}</b> open issue${open.length === 1 ? '' : 's'}${high ? ` · <b style="color:var(--bad)">${high} high</b>` : ''}</span>`;
+}
+function renderRooms() {
+  const rooms = new Set([...(inv || []).map(i => i.room), ...(template || []).map(t => t.room), ...DEFAULT_ROOMS].filter(Boolean));
+  $('#room-list').innerHTML = [...rooms].map(r => `<option value="${esc(r)}">`).join('');
+}
+
+/* ---------- inventory ---------- */
+const invList = $('#inv-list');
+function renderInventory() {
+  if (!inv) return;
+  const q = $('#inv-search').value.trim().toLowerCase();
+  const items = inv.filter(i => !q || `${i.item} ${i.room} ${i.notes}`.toLowerCase().includes(q))
+    .sort((a, b) => (a.room || '').localeCompare(b.room || '') || (a.item || '').localeCompare(b.item || ''));
+  if (!inv.length) { invList.innerHTML = '<p class="empty">No items yet. Add some from photos above, or one at a time by hand.</p>'; return; }
+  if (!items.length) { invList.innerHTML = '<p class="empty">Nothing matches that search.</p>'; return; }
+  invList.innerHTML = Object.entries(groupBy(items, 'room')).map(([room, list]) => `
+    <h3>${esc(room)} · ${list.reduce((n, i) => n + (Number(i.qty) || 0), 0)} items</h3>
+    <div class="tbl"><table class="stack"><thead><tr><th></th><th>Item</th><th>Qty</th><th>Condition</th><th>Notes</th><th>Last checked</th><th></th></tr></thead><tbody>
+    ${list.map(i => `<tr data-id="${esc(i.id)}">
+      <td class="c-photo">${i.photo ? `<button class="thumb" data-photo="${esc(i.photo)}" style="background-image:url(${blobUrl(esc(i.photo))});background-size:cover;background-position:center" aria-label="View photo of ${esc(i.item)}"></button>` : '<div class="thumb-empty"></div>'}</td>
+      <td class="c-item"><input data-f="item" value="${esc(i.item)}" aria-label="Item"></td>
+      <td class="c-qty"><input data-f="qty" type="number" min="0" value="${esc(i.qty)}" aria-label="Quantity"></td>
+      <td class="c-cond"><select data-f="condition" class="cond-${esc(i.condition)}" aria-label="Condition">${['Good', 'Fair', 'Poor', 'Missing'].map(c => `<option${c === i.condition ? ' selected' : ''}>${c}</option>`).join('')}</select></td>
+      <td class="c-notes"><input data-f="notes" value="${esc(i.notes)}" placeholder="Notes" aria-label="Notes"></td>
+      <td class="c-check"><input data-f="checked" type="date" value="${esc(i.checked)}" aria-label="Last checked"></td>
+      <td class="c-del"><button class="quiet" data-del>Delete</button></td>
+    </tr>`).join('')}</tbody></table></div>`).join('');
+}
+invList.addEventListener('change', e => {
+  const tr = e.target.closest('tr'), f = e.target.dataset.f; if (!tr || !f || !db) return;
+  const v = f === 'qty' ? Number(e.target.value) || 0 : e.target.value;
+  write('inventory/' + tr.dataset.id, () => db.doc('inventory/' + tr.dataset.id).update({ [f]: v }));
+});
+invList.addEventListener('click', e => {
+  const b = e.target.closest('[data-del]'); if (!b) return;
+  const id = b.closest('tr').dataset.id; const it = inv.find(i => i.id === id);
+  armed(b, async () => {
+    await write('inventory/' + id, () => db.doc('inventory/' + id).delete());
+    if (it?.photo && assets && !inv.some(o => o.id !== id && o.photo === it.photo)) assets.delete(it.photo).catch(() => {});
+  });
+});
+$('#inv-search').addEventListener('input', renderInventory);
+$('#inv-form').addEventListener('submit', async e => {
+  e.preventDefault(); if (!db) return;
+  const f = new FormData(e.target);
+  await db.collection('inventory').add({ room: f.get('room').trim(), item: f.get('item').trim(), qty: Number(f.get('qty')) || 0, condition: f.get('condition'), notes: '', checked: today(), photo: null, createdAt: Date.now() }).catch(err => toast(dbMessage(err)));
+  $('#inv-item').value = ''; $('#inv-qty').value = 1; $('#inv-item').focus();
+});
+$('#inv-checked').addEventListener('click', e => armed(e.target, async () => {
+  const d = today();
+  for (const i of inv) if (i.checked !== d) await write('inventory/' + i.id, () => db.doc('inventory/' + i.id).update({ checked: d })).catch(() => {});
+  toast('All items marked as checked today.');
+}));
+
+/* ---------- photo scan ---------- */
+let scanFiles = [], scanRows = [], scanCtl = null;
+const scanStatus = msg => { $('#scan-status').hidden = !msg; $('#scan-status').textContent = msg || ''; };
+$('#scan-files').addEventListener('change', e => {
+  const max = imageLimits?.maxCount || 5;
+  scanFiles = [...e.target.files].slice(0, max);
+  if (e.target.files.length > max) toast(`Using the first ${max} photos.`);
+  previews(scanFiles, $('#scan-previews'));
+  $('#scan-go').disabled = !scanFiles.length || !sample;
+});
+$('#scan-stop').addEventListener('click', () => scanCtl?.abort());
+$('#scan-go').addEventListener('click', async () => {
+  const room = $('#scan-room').value.trim();
+  if (!room) { $('#scan-room').focus(); toast('Enter the room these photos show.'); return; }
+  const existing = inv.filter(i => (i.room || '').toLowerCase() === room.toLowerCase());
+  const prompt = `You are helping build the contents inventory for a holiday rental property called Ziggy Rocks.
+These photos show the room: "${room}".
+Items already listed for this room: ${existing.length ? existing.map(i => `${i.item} (qty ${i.qty})`).join('; ') : 'none yet'}.
+
+List every distinct item a rental inventory should record: furniture, appliances, electricals, kitchenware, crockery, glassware, cutlery, cookware, linen, towels, soft furnishings, decor, safety equipment.
+Count carefully. List each type of cutlery, crockery and glassware separately (e.g. "Dinner knives", "Dessert spoons", "Side plates") with its count. Combine the same item seen across several photos instead of double counting.
+If an item matches one already listed, reuse that exact name.
+Give a condition of Good, Fair or Poor from what is visible, and a short note only when useful (colour, brand, visible damage, or "count uncertain").
+
+Reply with only JSON in this shape:
+{"items":[{"item":"Dinner forks","qty":8,"condition":"Good","notes":"stainless steel"}]}`;
+  scanCtl = new AbortController();
+  $('#scan-go').disabled = true; $('#scan-stop').hidden = false; $('#scan-result').hidden = true;
+  scanStatus('Looking at the photos… this usually takes 20 to 60 seconds.');
+  try {
+    const out = await sample.json(prompt, { images: scanFiles, signal: scanCtl.signal });
+    const items = Array.isArray(out?.items) ? out.items : Array.isArray(out) ? out : [];
+    scanRows = items.filter(x => x && x.item).map(x => {
+      const match = existing.find(i => i.item.toLowerCase() === String(x.item).toLowerCase());
+      return { sel: true, item: String(x.item), qty: Math.max(0, Math.round(Number(x.qty) || 1)), condition: ['Good', 'Fair', 'Poor'].includes(x.condition) ? x.condition : 'Good', notes: String(x.notes || ''), match };
+    });
+    if (!scanRows.length) { scanStatus('Claude could not find any inventory items in these photos. Try a closer or brighter photo.'); return; }
+    scanStatus(`Found ${scanRows.length} kinds of item. Untick anything wrong and correct the counts before adding.`);
+    renderScanRows();
+  } catch (e) {
+    const msg = {
+      cancelled: '', not_granted: 'Photo scanning needs permission to use Claude. Allow it from the page’s Permissions menu.',
+      rate_limited: 'Claude is busy or your usage limit is reached. Try again in a few minutes.',
+      image_rejected: 'One of the photos could not be read. Try JPEG or PNG photos under 20 MB.',
+      invalid_json: 'Claude’s answer could not be read as a list. Try again.', refused: 'Claude declined these photos. Try different ones.',
+    }[e?.code];
+    scanStatus(msg ?? 'Something went wrong while identifying items. Try again.');
+  } finally { $('#scan-go').disabled = !scanFiles.length; $('#scan-stop').hidden = true; }
+});
+function renderScanRows() {
+  $('#scan-result').hidden = false;
+  $('#scan-rows').innerHTML = scanRows.map((r, i) => `
+    <div class="scan-row" data-i="${i}">
+      <input type="checkbox" data-k="sel"${r.sel ? ' checked' : ''} aria-label="Include ${esc(r.item)}">
+      <input data-k="item" value="${esc(r.item)}" aria-label="Item">
+      <input data-k="qty" type="number" min="0" value="${r.qty}" aria-label="Quantity">
+      <select data-k="condition" aria-label="Condition">${['Good', 'Fair', 'Poor'].map(c => `<option${c === r.condition ? ' selected' : ''}>${c}</option>`).join('')}</select>
+      <div class="note">${r.match ? `Already listed with qty ${esc(r.match.qty)}. Adding will update it to this count. ` : ''}${esc(r.notes)}</div>
+    </div>`).join('');
+}
+$('#scan-rows').addEventListener('input', e => {
+  const row = e.target.closest('[data-i]'); const r = scanRows[row.dataset.i]; const k = e.target.dataset.k;
+  r[k] = k === 'sel' ? e.target.checked : k === 'qty' ? Number(e.target.value) || 0 : e.target.value;
+});
+function resetScan() { scanRows = []; scanFiles = []; $('#scan-files').value = ''; $('#scan-previews').innerHTML = ''; $('#scan-result').hidden = true; scanStatus(''); $('#scan-go').disabled = true; }
+$('#scan-cancel').addEventListener('click', resetScan);
+$('#scan-save').addEventListener('click', async () => {
+  const room = $('#scan-room').value.trim(); const chosen = scanRows.filter(r => r.sel && r.item.trim());
+  if (!chosen.length) { toast('Tick at least one item to add.'); return; }
+  $('#scan-save').disabled = true; scanStatus('Saving…');
+  let photo = null;
+  if (assets && scanFiles[0]) { try { photo = await uploadPhoto(scanFiles[0]); } catch { toast('The photo did not upload, but the items will still be added.'); } }
+  let added = 0, updated = 0;
+  try {
+    for (const r of chosen) {
+      if (r.match) {
+        const patch = { qty: r.qty, condition: r.condition, checked: today() };
+        if (photo && !r.match.photo) patch.photo = photo;
+        await write('inventory/' + r.match.id, () => db.doc('inventory/' + r.match.id).update(patch)); updated++;
+      } else {
+        await db.collection('inventory').add({ room, item: r.item.trim(), qty: r.qty, condition: r.condition, notes: r.notes, checked: today(), photo, createdAt: Date.now() }); added++;
+      }
+    }
+    toast(`Added ${added} and updated ${updated} item${added + updated === 1 ? '' : 's'} in ${room}.`);
+    resetScan();
+  } catch (e) { toast(dbMessage(e)); scanStatus(''); }
+  finally { $('#scan-save').disabled = false; }
+});
+
+/* ---------- cleaning ---------- */
+$('#clean-date').value = today();
+$('#clean-new').addEventListener('click', async () => {
+  if (!db) return;
+  if (!template?.length) { toast('The checklist template is empty. Add tasks to it first.'); $('#tpl-details').open = true; return; }
+  const ref = db.collection('cleans').doc();
+  openCleans.add(ref.id);
+  await ref.set({ date: $('#clean-date').value || today(), by: $('#clean-by').value.trim(), notes: '', createdAt: Date.now(), tasks: template.map(t => ({ room: t.room, task: t.task, done: false })) }).catch(e => toast(dbMessage(e)));
+  $('#clean-by').value = '';
+});
+const cleanList = $('#clean-list');
+function renderCleans() {
+  if (!cleans) return;
+  if (!cleans.length) { cleanList.innerHTML = '<div class="card"><p class="empty">No cleans recorded yet. Pick a date above and start a checklist. Each clean keeps its own dated record.</p></div>'; return; }
+  cleanList.innerHTML = cleans.map(c => {
+    const tasks = c.tasks || []; const done = tasks.filter(t => t.done).length; const pct = tasks.length ? Math.round(done / tasks.length * 100) : 0;
+    const open = openCleans.has(c.id);
+    const groups = groupBy(tasks.map((t, i) => ({ ...t, i })), 'room');
+    return `<div class="card" data-id="${esc(c.id)}">
+      <div class="row spread">
+        <div class="row"><span class="date">${esc(fmtDate(c.date))}</span>${c.by ? `<span class="hint">${esc(c.by)}</span>` : ''}
+          <span class="pill ${pct === 100 ? 'good' : done ? 'warn' : 'muted'}">${pct === 100 ? 'Complete' : `${done} of ${tasks.length} done`}</span></div>
+        <div class="row"><button data-toggle aria-expanded="${open}">${open ? 'Hide tasks' : 'Show tasks'}</button><button class="quiet" data-del>Delete</button></div>
+      </div>
+      <div class="progress"><div style="width:${pct}%"></div></div>
+      ${open ? Object.entries(groups).map(([room, ts]) => `<div><h3>${esc(room)}</h3>${ts.map(t => `
+        <div class="check${t.done ? ' done' : ''}"><input type="checkbox" id="t-${esc(c.id)}-${t.i}" data-i="${t.i}"${t.done ? ' checked' : ''}><label for="t-${esc(c.id)}-${t.i}">${esc(t.task)}</label></div>`).join('')}</div>`).join('') +
+        `<div><h3>Notes from this clean</h3><textarea id="notes-${esc(c.id)}" data-notes placeholder="Anything to report? Log damage or repairs in Issues too.">${esc(c.notes)}</textarea></div>` : (c.notes ? `<p class="hint">${esc(c.notes)}</p>` : '')}
+    </div>`;
+  }).join('');
+}
+cleanList.addEventListener('change', e => {
+  const card = e.target.closest('[data-id]'); const c = cleans.find(x => x.id === card?.dataset.id); if (!c) return;
+  if (e.target.dataset.i !== undefined) {
+    const tasks = c.tasks.map((t, i) => i === Number(e.target.dataset.i) ? { ...t, done: e.target.checked } : t);
+    c.tasks = tasks; renderCleans();
+    write('cleans/' + c.id, () => db.doc('cleans/' + c.id).update({ tasks }));
+  } else if (e.target.hasAttribute('data-notes')) {
+    write('cleans/' + c.id, () => db.doc('cleans/' + c.id).update({ notes: e.target.value }));
+  }
+});
+cleanList.addEventListener('click', e => {
+  const card = e.target.closest('[data-id]'); if (!card) return; const id = card.dataset.id;
+  if (e.target.closest('[data-toggle]')) { openCleans.has(id) ? openCleans.delete(id) : openCleans.add(id); renderCleans(); }
+  const del = e.target.closest('[data-del]'); if (del) armed(del, () => write('cleans/' + id, () => db.doc('cleans/' + id).delete()));
+});
+
+const tplList = $('#tpl-list');
+function renderTemplate() {
+  if (!template) return;
+  if (!template.length) { tplList.innerHTML = '<p class="empty">No tasks yet.</p><button id="tpl-default">Use a standard holiday-let checklist</button>'; return; }
+  tplList.innerHTML = Object.entries(groupBy(template, 'room')).map(([room, ts]) => `<h3>${esc(room)}</h3>` + ts.map(t =>
+    `<div class="check row spread" data-id="${esc(t.id)}"><span class="grow">${esc(t.task)}</span><button class="quiet" data-del>Remove</button></div>`).join('')).join('');
+}
+const saveTemplate = tasks => write('config/template', () => db.doc('config/template').set({ tasks }));
+tplList.addEventListener('click', e => {
+  if (e.target.id === 'tpl-default') saveTemplate(Object.entries(DEFAULT_TEMPLATE).flatMap(([room, ts]) => ts.map(task => ({ id: tid(), room, task }))));
+  if (e.target.closest('[data-del]')) { const id = e.target.closest('[data-id]').dataset.id; saveTemplate(template.filter(t => t.id !== id)); }
+});
+$('#tpl-form').addEventListener('submit', e => {
+  e.preventDefault(); const room = $('#tpl-room').value.trim(), task = $('#tpl-task').value.trim(); if (!room || !task || !db) return;
+  saveTemplate([...(template || []), { id: tid(), room, task }]); $('#tpl-task').value = ''; $('#tpl-task').focus();
+});
+
+/* ---------- issues ---------- */
+let issueFiles = [];
+$('#issue-date').value = today();
+$('#issue-files').addEventListener('change', e => { issueFiles = [...e.target.files].slice(0, 8); previews(issueFiles, $('#issue-previews')); });
+$('#issue-form').addEventListener('submit', async e => {
+  e.preventDefault(); if (!db) return;
+  const btn = $('#issue-submit'); btn.disabled = true;
+  const photos = [];
+  if (issueFiles.length && assets) {
+    btn.textContent = 'Uploading photos…';
+    for (const f of issueFiles) { try { photos.push(await uploadPhoto(f)); } catch { toast('A photo did not upload. The issue is still logged.'); } }
+  }
+  try {
+    await db.collection('issues').add({ title: $('#issue-title').value.trim(), room: $('#issue-room').value.trim(), priority: $('#issue-priority').value, date: $('#issue-date').value || today(), notes: $('#issue-notes').value.trim(), status: 'open', resolved: '', photos, createdAt: Date.now() });
+    e.target.reset(); $('#issue-date').value = today(); $('#issue-priority').value = 'medium'; issueFiles = []; $('#issue-previews').innerHTML = '';
+    toast('Issue logged.');
+  } catch (err) { toast(dbMessage(err)); }
+  finally { btn.disabled = false; btn.textContent = 'Log issue'; }
+});
+const issueList = $('#issue-list');
+const PRI = { high: 0, medium: 1, low: 2 };
+function renderIssues() {
+  if (!issues) return;
+  const filter = $('#issue-filter').value;
+  const list = issues.filter(i => filter === 'all' || (filter === 'resolved' ? i.status === 'resolved' : i.status !== 'resolved'))
+    .sort((a, b) => (a.status === 'resolved') - (b.status === 'resolved') || (PRI[a.priority] ?? 1) - (PRI[b.priority] ?? 1) || (b.date || '').localeCompare(a.date || ''));
+  if (!list.length) { issueList.innerHTML = `<p class="empty">${issues.length ? 'Nothing in this view.' : 'No issues logged. Use the form above when something needs fixing, replacing or restocking.'}</p>`; return; }
+  issueList.innerHTML = list.map(i => `
+    <div class="issue p-${esc(i.priority)}${i.status === 'resolved' ? ' resolved' : ''}" data-id="${esc(i.id)}">
+      <div class="row spread">
+        <strong>${esc(i.title)}</strong>
+        <div class="row">
+          <select data-status aria-label="Status">${[['open', 'Open'], ['in-progress', 'In progress'], ['resolved', 'Resolved']].map(([v, l]) => `<option value="${v}"${v === i.status ? ' selected' : ''}>${l}</option>`).join('')}</select>
+          <button class="quiet" data-del>Delete</button>
+        </div>
+      </div>
+      <div class="meta">${[i.room, `${i.priority} priority`, `reported ${fmtDate(i.date)}`, i.resolved ? `resolved ${fmtDate(i.resolved)}` : ''].filter(Boolean).map(esc).join(' · ')}</div>
+      <div>
+        ${i.notes ? `<p>${esc(i.notes)}</p>` : ''}
+        <div class="photos">
+          ${(i.photos || []).map(p => `<button class="thumb" data-photo="${esc(p)}" style="background-image:url(${blobUrl(esc(p))});background-size:cover;background-position:center" aria-label="View photo"></button>`).join('')}
+          ${assets ? `<label class="file" style="height:72px">+ Photo<input type="file" accept="image/*" multiple data-addphoto aria-label="Add photos to this issue"></label>` : ''}
+        </div>
+      </div>
+    </div>`).join('');
+}
+issueList.addEventListener('change', async e => {
+  const card = e.target.closest('[data-id]'); if (!card) return; const id = card.dataset.id; const it = issues.find(x => x.id === id);
+  if (e.target.hasAttribute('data-status')) {
+    const status = e.target.value;
+    write('issues/' + id, () => db.doc('issues/' + id).update({ status, resolved: status === 'resolved' ? today() : '' }));
+  }
+  if (e.target.hasAttribute('data-addphoto') && assets) {
+    const files = [...e.target.files]; if (!files.length) return; toast('Uploading photos…');
+    const ids = [];
+    for (const f of files) { try { ids.push(await uploadPhoto(f)); } catch { toast('A photo did not upload.'); } }
+    if (ids.length) await write('issues/' + id, () => db.doc('issues/' + id).update({ photos: [...(it.photos || []), ...ids] })).then(() => toast('Photos added.')).catch(() => {});
+  }
+});
+issueList.addEventListener('click', e => {
+  const b = e.target.closest('[data-del]'); if (!b) return; const id = b.closest('[data-id]').dataset.id; const it = issues.find(x => x.id === id);
+  armed(b, async () => {
+    await write('issues/' + id, () => db.doc('issues/' + id).delete());
+    if (assets) for (const p of it?.photos || []) assets.delete(p).catch(() => {});
+  });
+});
+$('#issue-filter').addEventListener('change', renderIssues);
+
+/* ---------- boot ---------- */
+function setWritable(on) {
+  for (const sel of ['#inv-form', '#tpl-form', '#issue-form']) $(sel).querySelectorAll('input,select,textarea,button').forEach(x => x.disabled = !on);
+  for (const sel of ['#clean-new', '#clean-date', '#clean-by', '#inv-checked']) $(sel).disabled = !on;
+}
+(async () => {
+  const c = window.claude;
+  if (!c?.use) { $('#offline').hidden = false; $('#summary').innerHTML = ''; setWritable(false); $('#scan-card').hidden = true; return; }
+  [db, assets, sample] = await Promise.all([c.use('db'), c.use('assets'), c.use('sample')]);
+  const user = await c.use('user');
+  if (!db) { $('#offline').hidden = false; $('#summary').innerHTML = ''; setWritable(false); $('#scan-card').hidden = true; ['#inv-list', '#clean-list', '#issue-list'].forEach(s => $(s).innerHTML = ''); return; }
+  const canWrite = user ? await user.can('data.write') : null;
+  if (canWrite === false) { setWritable(false); $('#scan-card').hidden = true; $('#offline').hidden = false; $('#offline').textContent = 'You can view these records. Ask the owner for Contributor access to tick off cleans or log issues.'; }
+  if (sample) { imageLimits = (await sample.limits().catch(() => null))?.images || null; }
+  if (!sample || !imageLimits) { $('#scan-card').querySelector('.hint').textContent = 'Photo scanning isn’t available in this view. You can still add items by hand below.'; $('#scan-card').querySelectorAll('.row, .previews').forEach(x => x.hidden = true); }
+  if (!assets) { $('#issue-photo-label').hidden = true; }
+
+  const loadTimer = setTimeout(() => { if (!inv || !cleans || !issues) toast('Still connecting to the records. Your changes may not show yet.'); }, 10000);
+  const done = () => { if (inv && cleans && issues && template) clearTimeout(loadTimer); renderSummary(); };
+  const fail = e => toast(e?.code === 'revoked' ? 'Access to these records has changed. Reload to continue.' : 'Could not load the records.');
+  db.collection('inventory').onSnapshot(s => { inv = s.docs.map(d => ({ id: d.id, ...d.data() })); safeRender(invList, renderInventory); renderRooms(); done(); }, fail);
+  db.collection('cleans').orderBy('date', 'desc').onSnapshot(s => {
+    const first = cleans === null;
+    cleans = s.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (first) { const live = cleans.find(x => (x.tasks || []).some(t => !t.done)); if (live) openCleans.add(live.id); }
+    safeRender(cleanList, renderCleans); done();
+  }, fail);
+  db.collection('issues').onSnapshot(s => { issues = s.docs.map(d => ({ id: d.id, ...d.data() })); safeRender(issueList, renderIssues); done(); }, fail);
+  db.doc('config/template').onSnapshot(s => { template = s.exists ? (s.data().tasks || []) : []; safeRender(tplList, renderTemplate); renderRooms(); done(); }, fail);
+})();
+</script>
