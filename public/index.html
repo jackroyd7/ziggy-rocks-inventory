@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ziggy Rocks</title>
+<meta name="description" content="Inventory, changeover checklists and issue log for Ziggy Rocks, Cookswood.">
+<meta name="theme-color" content="#fbfcfa" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a201d" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ziggy Rocks">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<template id="strata-tpl">
+  <div class="strata" aria-hidden="true">
+    <svg viewBox="0 0 800 120" preserveAspectRatio="none">
+      <path d="M0 38 C120 30 210 52 330 44 S560 26 680 38 S780 46 800 42 V120 H0Z" fill="var(--s1)"/>
+      <path d="M0 62 C140 54 230 74 360 66 S590 50 700 62 S780 70 800 66 V120 H0Z" fill="var(--s2)" opacity=".75"/>
+      <path d="M0 84 C110 78 250 94 380 86 S600 74 720 84 S790 90 800 88 V120 H0Z" fill="var(--s3)" opacity=".6"/>
+      <path d="M0 104 C150 98 260 112 400 106 S620 96 740 104 L800 102 V120 H0Z" fill="var(--s4)" opacity=".5"/>
+    </svg>
+  </div>
+</template>
+
+<!-- Sign in -->
+<section class="login" id="login" hidden>
+  <form id="login-form">
+    <div>
+      <p class="eyebrow">Cookswood · Somerset</p>
+      <h1>Ziggy Rocks</h1>
+    </div>
+    <p class="muted" style="margin:0">Inventory, changeover checklists and the list of things that need sorting.</p>
+    <label class="field"><span>Password</span><input id="login-pw" type="password" autocomplete="current-password" required></label>
+    <p class="err" id="login-err" role="alert"></p>
+    <button class="btn primary" id="login-btn">Sign in</button>
+  </form>
+</section>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="wrap top-inner">
+      <div>
+        <p class="eyebrow">Cookswood · Somerset</p>
+        <h1>Ziggy Rocks</h1>
+      </div>
+      <button class="btn ghost small" id="signout" title="Sign out"><svg class="icon"><use href="#i-out"/></svg><span>Sign out</span></button>
+    </div>
+    <div class="wrap stats" id="stats">
+      <button class="stat" data-go="inventory"><span class="n" id="st-items">–</span><span class="l" id="st-items-l">items</span></button>
+      <button class="stat" data-go="cleaning"><span class="n" id="st-co">–</span><span class="l" id="st-co-l">changeover</span></button>
+      <button class="stat" data-go="issues" id="st-issues-tile"><span class="n" id="st-issues">–</span><span class="l" id="st-issues-l">open issues</span></button>
+    </div>
+  </header>
+
+  <nav class="tabbar" aria-label="Sections">
+    <div class="wrap">
+      <div class="tabs">
+        <a href="#inventory" data-tab="inventory"><svg class="icon"><use href="#i-box"/></svg>Inventory</a>
+        <a href="#cleaning" data-tab="cleaning"><svg class="icon"><use href="#i-list"/></svg>Changeovers</a>
+        <a href="#issues" data-tab="issues"><svg class="icon"><use href="#i-alert"/></svg>Issues<span class="badge" id="tab-badge" hidden></span></a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="wrap">
+    <!-- INVENTORY -->
+    <section class="view" id="v-inventory">
+      <div class="card feature">
+        <div class="glyph"><svg class="icon"><use href="#i-camera"/></svg></div>
+        <div><h2>Scan a cupboard or drawer</h2><p>Take photos and Claude lists and counts what's there. You check it before it's saved.</p></div>
+        <button class="btn" id="open-scan"><svg class="icon"><use href="#i-camera"/></svg>Scan photos</button>
+      </div>
+      <div class="toolbar">
+        <label class="search"><svg class="icon"><use href="#i-search"/></svg><input id="inv-search" type="search" placeholder="Search the inventory" aria-label="Search the inventory"></label>
+        <button class="btn" id="open-item"><svg class="icon"><use href="#i-plus"/></svg><span>Add item</span></button>
+      </div>
+      <div class="chips" id="room-chips" role="toolbar" aria-label="Filter by room"></div>
+      <div id="inv-list" style="display:grid;gap:14px"><div class="skeleton"></div><div class="skeleton"></div></div>
+    </section>
+
+    <!-- CHANGEOVERS -->
+    <section class="view" id="v-cleaning" hidden>
+      <div class="card">
+        <h2>Start a changeover</h2>
+        <div class="starts" id="starts"></div>
+      </div>
+      <div id="co-active" style="display:grid;gap:14px"></div>
+      <div class="section-title" id="co-history-title" hidden><h3>Earlier changeovers</h3></div>
+      <div id="co-history" style="display:grid;gap:10px"></div>
+      <div class="tools-grid">
+        <button class="tool" id="open-plans"><svg class="icon"><use href="#i-map"/></svg><span><strong>Floor plans</strong><small>Which room is which</small></span></button>
+        <button class="tool" id="open-tpl"><svg class="icon"><use href="#i-edit"/></svg><span><strong>Edit checklists</strong><small>Add or remove tasks</small></span></button>
+      </div>
+    </section>
+
+    <!-- ISSUES -->
+    <section class="view" id="v-issues" hidden>
+      <div class="row between issues-bar">
+        <div class="chips" id="issue-chips" role="toolbar" aria-label="Filter issues"></div>
+        <button class="btn primary" id="open-issue"><svg class="icon"><use href="#i-plus"/></svg>Log an issue</button>
+      </div>
+      <div id="issue-list" style="display:grid;gap:12px"><div class="skeleton"></div></div>
+    </section>
+  </main>
+  <button class="fab" id="fab" aria-label="Log an issue" hidden><svg class="icon"><use href="#i-plus"/></svg></button>
+</div>
+
+<!-- Scan sheet -->
+<dialog class="sheet" id="d-scan" aria-labelledby="scan-title">
+  <div class="sheet-head"><h2 id="scan-title">Scan photos</h2><button class="btn ghost icon-only" data-close aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button></div>
+  <div class="sheet-body">
+    <div id="scan-setup" class="picker">
+      <label class="field"><span>Room</span><input type="text" id="scan-room" list="rooms" placeholder="For example Kitchen" autocomplete="off"></label>
+      <label class="drop"><svg class="icon"><use href="#i-camera"/></svg><strong>Take or choose photos</strong><small>Up to 5. Get the whole shelf or drawer in.</small><input type="file" id="scan-files" accept="image/*" multiple></label>
+      <div class="previews" id="scan-previews"></div>
+    </div>
+    <div id="scan-wait" class="thinking" hidden><div class="spinner"></div><strong>Looking at your photos</strong><span>This usually takes 20 to 60 seconds.</span></div>
+    <div id="scan-result" hidden>
+      <p class="muted" id="scan-summary" style="margin:0 0 10px"></p>
+      <div class="found" id="scan-rows"></div>
+    </div>
+  </div>
+  <div class="sheet-foot">
+    <button class="btn ghost" data-close>Cancel</button>
+    <button class="btn" id="scan-again" hidden>Different photos</button>
+    <button class="btn primary" id="scan-go" disabled>Identify items</button>
+    <button class="btn primary" id="scan-save" hidden>Add to inventory</button>
+  </div>
+</dialog>
+
+<!-- Item sheet -->
+<dialog class="sheet" id="d-item" aria-labelledby="item-title">
+  <form method="dialog" id="item-form" style="display:contents">
+    <div class="sheet-head"><h2 id="item-title">Add item</h2><button type="button" class="btn ghost icon-only" data-close aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button></div>
+    <div class="sheet-body">
+      <label class="field"><span>Item</span><input type="text" id="it-item" required placeholder="For example Wine glasses"></label>
+      <div class="two">
+        <label class="field"><span>Room</span><input type="text" id="it-room" list="rooms" required autocomplete="off"></label>
+        <label class="field"><span>Quantity</span><input type="number" id="it-qty" min="0" inputmode="numeric" value="1"></label>
+      </div>
+      <div class="field"><span>Condition</span><div class="seg" id="it-cond" role="group" aria-label="Condition"><button type="button" data-v="Good">Good</button><button type="button" data-v="Fair">Fair</button><button type="button" data-v="Poor">Poor</button><button type="button" data-v="Missing">Missing</button></div></div>
+      <label class="field"><span>Notes</span><input type="text" id="it-notes" placeholder="Colour, brand, where it's kept"></label>
+      <div class="two">
+        <label class="field"><span>Last checked</span><input type="date" id="it-checked"></label>
+        <div class="field"><span>Photo</span><div class="row"><div class="thumb" id="it-thumb"><svg class="icon"><use href="#i-image"/></svg></div><label class="btn small" style="position:relative">Choose<input type="file" id="it-photo" accept="image/*" style="position:absolute;inset:0;opacity:0"></label></div></div>
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <button type="button" class="btn ghost danger" id="it-delete" hidden>Delete</button><span class="spacer"></span>
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button class="btn primary" id="it-save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Start changeover sheet -->
+<dialog class="sheet" id="d-start" aria-labelledby="start-title">
+  <form method="dialog" id="start-form" style="display:contents">
+    <div class="sheet-head"><h2 id="start-title">Start a changeover</h2><button type="button" class="btn ghost icon-only" data-close aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button></div>
+    <div class="sheet-body">
+      <div class="choice" id="start-choice"></div>
+      <div class="two">
+        <label class="field"><span>Date</span><input type="date" id="start-date" required></label>
+        <label class="field"><span>Done by</span><input type="text" id="start-by" placeholder="Your name" autocomplete="name"></label>
+      </div>
+    </div>
+    <div class="sheet-foot"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary">Start checklist</button></div>
+  </form>
+</dialog>
+
+<!-- Issue sheet -->
+<dialog class="sheet" id="d-issue" aria-labelledby="issue-title">
+  <form method="dialog" id="issue-form" style="display:contents">
+    <div class="sheet-head"><h2 id="issue-title">Log an issue</h2><button type="button" class="btn ghost icon-only" data-close aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button></div>
+    <div class="sheet-body">
+      <label class="field"><span>What needs sorting?</span><input type="text" id="is-title" required placeholder="For example Shower door seal is leaking"></label>
+      <div class="two">
+        <label class="field"><span>Room</span><input type="text" id="is-room" list="rooms" autocomplete="off"></label>
+        <label class="field"><span>Date reported</span><input type="date" id="is-date"></label>
+      </div>
+      <div class="field"><span>Priority</span><div class="seg" id="is-pri" role="group" aria-label="Priority"><button type="button" data-v="high">High</button><button type="button" data-v="medium">Medium</button><button type="button" data-v="low">Low</button></div></div>
+      <label class="field"><span>Details</span><textarea id="is-notes" placeholder="What happened, who noticed it, anything already tried"></textarea></label>
+      <div class="picker">
+        <label class="drop"><svg class="icon"><use href="#i-camera"/></svg><strong>Add photos</strong><small>Optional, up to 8</small><input type="file" id="is-files" accept="image/*" multiple></label>
+        <div class="previews" id="is-previews"></div>
+      </div>
+    </div>
+    <div class="sheet-foot"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary" id="is-save">Log issue</button></div>
+  </form>
+</dialog>
+
+<!-- Checklist editor -->
+<dialog class="sheet" id="d-tpl" aria-labelledby="tpl-title">
+  <div class="sheet-head"><h2 id="tpl-title">Edit checklists</h2><button class="btn ghost icon-only" data-close aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button></div>
+  <div class="sheet-body">
+    <div class="seg" id="tpl-which" role="group" aria-label="Checklist"></div>
+    <div id="tpl-list"></div>
+    <form id="tpl-form" class="two" style="align-items:end">
+      <label class="field"><span>Room</span><input type="text" id="tpl-room" list="rooms" required autocomplete="off"></label>
+      <label class="field"><span>New task</span><input type="text" id="tpl-task" required></label>
+      <button class="btn" style="grid-column:1/-1"><svg class="icon"><use href="#i-plus"/></svg>Add task</button>
+    </form>
+  </div>
+</dialog>
+
+<!-- Floor plans -->
+<dialog class="sheet" id="d-plans" aria-labelledby="plans-title">
+  <div class="sheet-head"><h2 id="plans-title">Floor plans</h2><button class="btn ghost icon-only" data-close aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button></div>
+  <div class="sheet-body plans">
+    <figure><img src="/floorplans/ground-and-first.jpg" alt="Ground floor: entrance, dry room, WC, utility room, cinema room and living/dining room. First floor: bathroom and bedrooms 2, 3 and 4." loading="lazy" data-zoom><figcaption>Ground and first floor</figcaption></figure>
+    <figure><img src="/floorplans/second-and-third.jpg" alt="Second floor: bedroom 1 with ensuite, bathroom, study and balcony. Third floor: roof terrace." loading="lazy" data-zoom><figcaption>Second and third floor</figcaption></figure>
+  </div>
+</dialog>
+
+<dialog class="lightbox" id="d-photo"><img alt=""><button class="btn icon-only" data-close aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button></dialog>
+<datalist id="rooms"></datalist>
+<div id="toast" role="status" hidden></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="5" rx="1.2"/><path d="m4.3 6.6 1 1 1.6-1.9"/><rect x="3" y="14" width="5" height="5" rx="1.2"/><path d="M11 6.5h10M11 16.5h10"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 4.1 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.1a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4.5M12 17.3v.2"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l1.6-2.4A1.5 1.5 0 0 1 9.9 5h4.2a1.5 1.5 0 0 1 1.3.6L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20z"/><path d="M9 4v13.5M15 6.5V20"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7M6 9.5V20h12V9.5"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="14" r="4"/><path d="m11 11 9-9M17 5l2 2M15 7l2 2"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+</svg>
+
+<script src="/app.js" type="module"></script>
+</body>
+</html>
