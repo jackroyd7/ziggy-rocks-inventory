@@ -16,7 +16,7 @@ const COND = ["Good", "Fair", "Poor", "Missing"];
 const PRI = { high: 0, medium: 1, low: 2 };
 const STATUS = [["open", "Open"], ["in-progress", "In progress"], ["resolved", "Resolved"]];
 
-const S = { me: null, people: [], inventory: [], cleans: [], issues: [], checklists: [], mylist: [], settings: {} };
+const S = { me: null, people: [], inventory: [], cleans: [], issues: [], checklists: [], mylist: [] };
 const isOwner = () => S.me?.role === "owner";
 const nameOf = id => S.people.find(p => p.id === id)?.name || "";
 let loaded = false;
@@ -50,7 +50,6 @@ async function save(op, collection, id, data) {
     else if (op === "set") { const rec = { id, ...data }; i >= 0 ? (list[i] = rec) : list.push(rec); }
     else if (i >= 0) list[i] = { ...list[i], ...data };
   } else if (id === "template") S.checklists = data.checklists;
-  else if (id === "settings") S.settings = { ...data };
   renderAll();
   try { await api("/api/doc", { method: "POST", body: { op, collection, id, data } }); }
   catch (e) { toast(e.message); refresh().catch(() => {}); throw e; }
@@ -304,7 +303,7 @@ function coCard(c) {
         <div class="seg" role="group" aria-label="Show"><button data-only="0" aria-pressed="${!only}">All tasks</button><button data-only="1" aria-pressed="${only}">Not done (${left})</button></div>
         ${finished ? `<span class="row"><span class="muted" style="font-size:.88rem">Finished ${esc(fmtTime(c.finishedAt))}</span><button class="btn ghost small" data-reopen>Reopen</button></span>` : ""}
       </div>
-      ${rooms || `<div class="empty" style="padding:16px">${icon("check")}<p>Every task is ticked.</p></div>`}
+      ${rooms ? `<div class="rooms">${rooms}</div>` : `<div class="empty" style="padding:16px">${icon("check")}<p>Every task is ticked.</p></div>`}
       <label class="field"><span>Notes from this changeover</span><textarea data-notes placeholder="Anything to report? Log damage or repairs in Issues too.">${esc(c.notes)}</textarea></label>
       <div class="row between">
         <button class="btn ghost danger small" data-del>${icon("trash")}Delete</button>
@@ -413,6 +412,7 @@ function renderIssues() {
         <div><h3>${esc(i.title)}</h3>
           <div class="meta">${i.room ? `<span>${esc(i.room)}</span><span>·</span>` : ""}<span class="tag ${i.priority === "high" ? "bad" : i.priority === "medium" ? "warn" : ""}">${esc(i.priority)} priority</span><span>· ${esc(fmtDate(i.date, { day: "numeric", month: "short" }))}</span>${nameOf(i.createdBy) ? `<span>· by ${esc(nameOf(i.createdBy))}</span>` : ""}${i.private ? `<span class="tag private">${icon("lock", "icon")} Only you</span>` : ""}${i.resolved ? `<span class="tag good">Resolved ${esc(fmtDate(i.resolved, { day: "numeric", month: "short" }))}</span>` : ""}</div></div>
         ${i.notes ? `<p class="notes">${esc(i.notes)}</p>` : ""}
+        ${commentsBlock(i)}
         <div class="photos">${(i.photos || []).map(p => thumb(p, i.title)).join("")}<label class="addphoto">${icon("camera")}<input type="file" accept="image/*" multiple data-addphoto aria-label="Add photos to ${esc(i.title)}"></label></div>
         <div class="row between">
           <div class="seg" role="group" aria-label="Status">${STATUS.map(([v, l]) => `<button data-status="${v}" aria-pressed="${i.status === v}">${l}</button>`).join("")}</div>
@@ -421,9 +421,36 @@ function renderIssues() {
       </div>
     </article>`).join("");
 }
+function commentsBlock(i) {
+  const list = i.comments || []; const all = ui.allComments?.has(i.id); const shown = all ? list : list.slice(-3);
+  return `<div class="comments">
+    ${list.length > shown.length ? `<button class="btn ghost small" data-morecomments>Show all ${list.length} comments</button>` : ""}
+    ${shown.map(c => `<div class="comment" data-cid="${esc(c.id)}"><span class="avatar sm">${esc((nameOf(c.by) || "?").slice(0, 1).toUpperCase())}</span>
+      <div><div class="who"><strong>${esc(nameOf(c.by) || "Someone")}</strong> <span class="muted">${esc(fmtTime(c.at))}</span>${c.by === S.me?.id || isOwner() ? `<button class="link-del" data-delcomment aria-label="Delete comment">Delete</button>` : ""}</div><p>${esc(c.text)}</p></div></div>`).join("")}
+    <form class="comment-form" data-commentform><input type="text" placeholder="Add a comment" aria-label="Add a comment to ${esc(i.title)}" maxlength="2000"><button class="btn small" aria-label="Post comment">${icon("send")}</button></form>
+  </div>`;
+}
+ui.allComments = new Set();
+$("#issue-list").addEventListener("submit", async e => {
+  if (!e.target.matches("[data-commentform]")) return; e.preventDefault();
+  const card = e.target.closest(".issue"); const input = e.target.querySelector("input"); const text = input.value.trim(); if (!text) return;
+  const btn = e.target.querySelector("button"); btn.disabled = true;
+  try {
+    const { comment } = await api("/api/comment", { method: "POST", body: { issueId: card.dataset.id, text } });
+    const it = S.issues.find(x => x.id === card.dataset.id); if (it) it.comments = [...(it.comments || []), comment];
+    input.value = ""; input.blur(); renderIssues();
+  } catch (err) { toast(err.message); } finally { btn.disabled = false; }
+});
 $("#issue-chips").addEventListener("click", e => { const c = e.target.closest("[data-f]"); if (c) { ui.issueFilter = c.dataset.f; renderIssues(); } });
 $("#issue-list").addEventListener("click", e => {
   const card = e.target.closest(".issue"); if (!card) return; const it = S.issues.find(i => i.id === card.dataset.id); if (!it) return;
+  if (e.target.closest("[data-morecomments]")) { ui.allComments.add(it.id); renderIssues(); return; }
+  const dc = e.target.closest("[data-delcomment]");
+  if (dc) {
+    const cid = dc.closest("[data-cid]").dataset.cid; if (!confirm("Delete this comment?")) return;
+    api("/api/comment", { method: "POST", body: { issueId: it.id, remove: cid } }).then(() => { it.comments = (it.comments || []).filter(c => c.id !== cid); renderIssues(); }).catch(err => toast(err.message));
+    return;
+  }
   const st = e.target.closest("[data-status]");
   if (st && st.dataset.status !== it.status) save("update", "issues", it.id, { status: st.dataset.status, resolved: st.dataset.status === "resolved" ? today() : "" }).then(() => st.dataset.status === "resolved" && toast("Marked as resolved.")).catch(() => {});
   if (e.target.closest("[data-del]") && confirm(`Delete “${it.title}”?`)) { save("delete", "issues", it.id).catch(() => {}); (it.photos || []).forEach(deletePhoto); }
@@ -499,30 +526,8 @@ function renderMe() {
   $("#me-name").textContent = S.me.name; $("#me-initial").textContent = S.me.name.slice(0, 1).toUpperCase();
   $("#acc-name").textContent = S.me.name; $("#acc-role").textContent = isOwner() ? "Owner" : "Cleaner / helper";
   $("#open-people").hidden = !isOwner(); $("#tab-mylist").hidden = !isOwner();
-  const photo = S.settings?.headerPhoto, top = $(".top");
-  top.classList.toggle("has-photo", !!photo);
-  if (photo) { top.style.setProperty("--hdr-photo", `url("${photo.replace(/"/g, "%22")}")`); top.style.setProperty("--hdr-focus", (S.settings.headerFocus ?? 60) + "%"); }
-  else top.style.removeProperty("--hdr-photo");
-  $("#hdr-photo-box").hidden = !isOwner();
-  $("#hdr-photo-remove").hidden = !photo; $("#hdr-focus-row").hidden = !photo;
-  $("#hdr-photo-label").textContent = photo ? "Change photo" : "Choose photo";
-  if (document.activeElement !== $("#hdr-focus")) $("#hdr-focus").value = S.settings?.headerFocus ?? 60;
 }
-const saveSettings = patch => save("set", "config", "settings", { ...S.settings, ...patch });
 $("#open-account").addEventListener("click", () => { $("#pw-form").reset(); openSheet("#d-account"); });
-$("#hdr-photo").addEventListener("change", async e => {
-  const f = e.target.files[0]; if (!f) return;
-  $("#hdr-photo-label").textContent = "Uploading…";
-  try { const old = S.settings?.headerPhoto; const url = await uploadPhoto(f); await saveSettings({ headerPhoto: url, headerFocus: 60 }); if (old) deletePhoto(old); toast("Header photo updated."); }
-  catch (err) { toast(err.message); renderMe(); }
-  e.target.value = "";
-});
-$("#hdr-photo-remove").addEventListener("click", async () => {
-  const old = S.settings?.headerPhoto; if (!old || !confirm("Remove the header photo?")) return;
-  await saveSettings({ headerPhoto: null }).catch(() => {}); deletePhoto(old);
-});
-$("#hdr-focus").addEventListener("input", e => $(".top").style.setProperty("--hdr-focus", e.target.value + "%"));
-$("#hdr-focus").addEventListener("change", e => saveSettings({ headerFocus: Number(e.target.value) }).catch(() => {}));
 $("#pw-form").addEventListener("submit", async e => {
   e.preventDefault();
   try { await api("/api/password", { method: "POST", body: { current: $("#pw-current").value, next: $("#pw-next").value } }); $("#pw-form").reset(); toast("Password changed. Other devices are now signed out."); }
