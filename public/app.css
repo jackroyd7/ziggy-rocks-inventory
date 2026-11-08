@@ -335,3 +335,9 @@ dialog.lightbox .btn { position: fixed; top: calc(12px + env(safe-area-inset-top
 .room-head h4::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--accent); margin-right: 8px; vertical-align: 1px; }
 .card { box-shadow: 0 1px 2px rgb(16 24 40 / .05), 0 10px 24px -12px rgb(16 24 40 / .18); }
 @media (prefers-color-scheme: dark) { .card { box-shadow: none; } }
+
+/* optional photo behind the header, darkened so the text stays readable */
+.top.has-photo { background-image: linear-gradient(180deg, rgb(6 14 32 / .62) 0%, rgb(6 14 32 / .30) 42%, rgb(6 14 32 / .55) 100%), var(--hdr-photo); background-size: cover; background-position: center var(--hdr-focus, 60%); }
+.top.has-photo::after { display: none; }
+.top.has-photo .stat { background: rgb(8 18 40 / .42); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.top.has-photo h1, .top.has-photo .eyebrow { text-shadow: 0 1px 12px rgb(0 0 0 / .35); }
