@@ -8,7 +8,11 @@ import { protect, json, isSignedIn } from "../lib/auth.js";
 import { savePhoto, loadPhoto, removePhoto } from "../lib/store.js";
 
 const TYPES = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
-const hasBlob = () => !!process.env.BLOB_READ_WRITE_TOKEN;
+// Blob can be connected with a read-write token (any variable name, since Vercel lets you pick a prefix)
+// or, on newer stores, with BLOB_STORE_ID and Vercel's built-in identity.
+const blobToken = () => process.env.BLOB_READ_WRITE_TOKEN || Object.values(process.env).find(v => typeof v === "string" && v.startsWith("vercel_blob_rw_"));
+const hasBlob = () => !!(blobToken() || process.env.BLOB_STORE_ID);
+const blobOpts = () => (blobToken() ? { token: blobToken() } : {});
 const ID = /^[a-f0-9]{32}$/;
 
 export const POST = protect(async request => {
@@ -18,8 +22,10 @@ export const POST = protect(async request => {
   if (!body.length) return json({ error: "The photo was empty." }, 400);
   if (body.length > 4_000_000) return json({ error: "That photo is too large." }, 413);
   if (hasBlob()) {
-    const blob = await put(`photos/${Date.now()}.${TYPES[type]}`, body, { access: "public", contentType: type, addRandomSuffix: true });
-    return json({ url: blob.url });
+    try {
+      const blob = await put(`photos/${Date.now()}.${TYPES[type]}`, body, { access: "public", contentType: type, addRandomSuffix: true, ...blobOpts() });
+      return json({ url: blob.url });
+    } catch (e) { console.error("Blob upload failed, keeping the photo in the database instead:", e?.message || e); }
   }
   const id = randomBytes(16).toString("hex");
   await savePhoto(id, type, body.toString("base64"));
@@ -41,6 +47,6 @@ export const DELETE = protect(async request => {
   const url = new URL(request.url).searchParams.get("url") || "";
   const local = url.match(/^\/api\/photo\?id=([a-f0-9]{32})$/);
   if (local) await removePhoto(local[1]);
-  else if (hasBlob() && /^https:\/\/[a-z0-9-]+\.public\.blob\.vercel-storage\.com\//.test(url)) await del(url);
+  else if (hasBlob() && /^https:\/\/[a-z0-9-]+\.public\.blob\.vercel-storage\.com\//.test(url)) await del(url, blobOpts()).catch(e => console.error("Blob delete failed:", e?.message || e));
   return json({ ok: true });
 });
