@@ -6,8 +6,8 @@
   --accent: #2f5d3a; --accent-ink: #ffffff; --accent-soft: #dce8d8;
   --ochre: #9a6a12; --rust: #b0452a; --good: #2d7543;
   --s1: #cfd2c8; --s2: #b5b4a5; --s3: #8e9b8a; --s4: #5d6e5d; --s5: #2f3f34;
-  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
-  --body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --radius: 14px; --shadow: 0 1px 2px rgb(20 30 25 / .06), 0 6px 20px -8px rgb(20 30 25 / .18);
   color-scheme: light;
 }
