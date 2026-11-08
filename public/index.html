@@ -13,7 +13,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/app.css?v=73387cd2">
 </head>
 <body>
 
@@ -29,7 +29,7 @@
     <label class="field" id="f-app" hidden><span>App password (set in Vercel)</span><input id="login-app" type="password" autocomplete="off"></label>
     <label class="field" id="f-name"><span>Your name</span><input id="login-name" type="text" autocomplete="username" autocapitalize="words" required></label>
     <label class="field" id="f-pw"><span>Password</span><input id="login-pw" type="password" autocomplete="current-password"></label>
-    <label class="field" id="f-new" hidden><span id="f-new-label">Choose a password</span><input id="login-new" type="password" autocomplete="new-password" minlength="6"><small class="muted">At least 6 characters.</small></label>
+    <label class="field" id="f-new" hidden><span id="f-new-label">Choose a password</span><input id="login-new" type="password" autocomplete="new-password"></label>
     <p class="err" id="login-err" role="alert"></p>
     <button class="btn primary" id="login-btn">Sign in</button>
     <button type="button" class="btn ghost small" id="login-back" hidden>Use a different name</button>
@@ -228,7 +228,7 @@
     <form id="pw-form" class="picker">
       <h3 style="font-size:1rem">Change your password</h3>
       <label class="field"><span>Current password</span><input type="password" id="pw-current" autocomplete="current-password" required></label>
-      <label class="field"><span>New password</span><input type="password" id="pw-next" autocomplete="new-password" minlength="6" required></label>
+      <label class="field"><span>New password</span><input type="password" id="pw-next" autocomplete="new-password" required></label>
       <button class="btn">Change password</button>
     </form>
   </div>
@@ -284,6 +284,6 @@
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
 </svg>
 
-<script src="/app.js" type="module"></script>
+<script src="/app.js?v=73387cd2" type="module"></script>
 </body>
 </html>

@@ -21,19 +21,21 @@ export async function POST(request) {
     if ((await users()).length) return json({ error: "The owner account already exists. Sign in with your name." }, 409);
     if (!appPasswordMatches(body.appPassword || "")) { await slow(); return json({ error: "That isn't the app password set in Vercel." }, 401); }
     if (!name) return json({ error: "Enter your name." }, 400);
-    if (!goodPassword(body.password)) return json({ error: "Choose a password of at least 6 characters." }, 400);
+    if (!goodPassword(body.password)) return json({ error: "Choose a password." }, 400);
     const owner = { id: randomBytes(8).toString("hex"), name, role: "owner", pass: await hashPassword(body.password), ver: 1, createdAt: Date.now() };
     await saveUser(owner);
     return json({ signedIn: true, me: publicUser(owner) }, 200, { "set-cookie": sessionCookie(owner) });
   }
 
+  if (!name && body.password && !("newPassword" in body)) return json({ error: "The app has been updated. Refresh the page (on iPhone, close the app and open it again) to sign in with your name." }, 400);
+  if (!body.setup && (await users()).length === 0) return json({ needsSetup: true });
   if (!name) return json({ error: "Enter your name." }, 400);
   const user = await findByName(name);
   if (!user) { await slow(); return json({ error: "There's no one with that name. Check the spelling, or ask the owner to add you." }, 401); }
 
   if (!user.pass) {
     if (body.newPassword === undefined) return json({ needsPassword: true, name: user.name });
-    if (!goodPassword(body.newPassword)) return json({ error: "Choose a password of at least 6 characters." }, 400);
+    if (!goodPassword(body.newPassword)) return json({ error: "Choose a password." }, 400);
     user.pass = await hashPassword(body.newPassword); user.ver = (user.ver || 0) + 1;
     await saveUser(user);
     return json({ signedIn: true, me: publicUser(user) }, 200, { "set-cookie": sessionCookie(user) });

@@ -560,7 +560,8 @@ function setLoginMode(mode, note = "") {
 async function showLogin() {
   $("#app").hidden = true; $("#login").hidden = false; loaded = false;
   $("#login-name").value = store.get("zr-name") || ""; $("#login-pw").value = ""; $("#login-new").value = "";
-  const r = await api("/api/login").catch(() => ({}));
+  const r = await api("/api/login").catch(() => ({ failed: true }));
+  if (r.failed) { setLoginMode("login"); $("#login-err").textContent = "Couldn't reach the server. Check your connection, then refresh the page."; return; }
   if (r.needsSetup) setLoginMode("setup", "First time here: enter the app password from Vercel, then create your owner account.");
   else setLoginMode("login");
 }
@@ -576,6 +577,7 @@ $("#login-form").addEventListener("submit", async e => {
     : loginMode === "choose" ? { name, newPassword: $("#login-new").value } : { name, password: $("#login-pw").value };
   try {
     const r = await api("/api/login", { method: "POST", body });
+    if (r.needsSetup) { setLoginMode("setup", "First time here: enter the app password from Vercel, then create your owner account."); return; }
     if (r.needsPassword) { $("#login-name").value = r.name; setLoginMode("choose", `Welcome, ${r.name}. This is your first sign-in, so choose a password you'll use from now on.`); return; }
     store.set("zr-name", r.me.name); $("#login-pw").value = ""; $("#login-new").value = ""; $("#login-app").value = "";
     showApp();
