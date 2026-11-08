@@ -36,9 +36,14 @@
       <h1>Ziggy Rocks</h1>
     </div>
     <p class="muted" style="margin:0">Inventory, changeover checklists and the list of things that need sorting.</p>
-    <label class="field"><span>Password</span><input id="login-pw" type="password" autocomplete="current-password" required></label>
+    <p class="note" id="login-note" hidden></p>
+    <label class="field" id="f-app" hidden><span>App password (set in Vercel)</span><input id="login-app" type="password" autocomplete="off"></label>
+    <label class="field" id="f-name"><span>Your name</span><input id="login-name" type="text" autocomplete="username" autocapitalize="words" required></label>
+    <label class="field" id="f-pw"><span>Password</span><input id="login-pw" type="password" autocomplete="current-password"></label>
+    <label class="field" id="f-new" hidden><span id="f-new-label">Choose a password</span><input id="login-new" type="password" autocomplete="new-password" minlength="6"><small class="muted">At least 6 characters.</small></label>
     <p class="err" id="login-err" role="alert"></p>
     <button class="btn primary" id="login-btn">Sign in</button>
+    <button type="button" class="btn ghost small" id="login-back" hidden>Use a different name</button>
   </form>
 </section>
 
@@ -49,7 +54,7 @@
         <p class="eyebrow">Cookswood · Somerset</p>
         <h1>Ziggy Rocks</h1>
       </div>
-      <button class="btn ghost small" id="signout" title="Sign out"><svg class="icon"><use href="#i-out"/></svg><span>Sign out</span></button>
+      <button class="btn ghost small account-btn" id="open-account"><span class="avatar" id="me-initial">?</span><span id="me-name">Account</span></button>
     </div>
     <div class="wrap stats" id="stats">
       <button class="stat" data-go="inventory"><span class="n" id="st-items">–</span><span class="l" id="st-items-l">items</span></button>
@@ -64,6 +69,7 @@
         <a href="#inventory" data-tab="inventory"><svg class="icon"><use href="#i-box"/></svg>Inventory</a>
         <a href="#cleaning" data-tab="cleaning"><svg class="icon"><use href="#i-list"/></svg>Changeovers</a>
         <a href="#issues" data-tab="issues"><svg class="icon"><use href="#i-alert"/></svg>Issues<span class="badge" id="tab-badge" hidden></span></a>
+        <a href="#mylist" data-tab="mylist" id="tab-mylist" hidden><svg class="icon"><use href="#i-pin"/></svg>My list</a>
       </div>
     </div>
   </nav>
@@ -106,6 +112,22 @@
         <button class="btn primary" id="open-issue"><svg class="icon"><use href="#i-plus"/></svg>Log an issue</button>
       </div>
       <div id="issue-list" style="display:grid;gap:12px"><div class="skeleton"></div></div>
+    </section>
+    <!-- MY LIST (owner only) -->
+    <section class="view" id="v-mylist" hidden>
+      <div class="card">
+        <div class="row between" style="margin-bottom:10px"><h2>My list</h2><span class="tag">Only you can see this</span></div>
+        <form id="ml-form" class="ml-form">
+          <input type="text" id="ml-text" placeholder="Add a reminder, a job, something to take…" required aria-label="New item">
+          <div class="row">
+            <div class="seg" id="ml-kind" role="group" aria-label="Kind"><button type="button" data-v="todo">To do</button><button type="button" data-v="take">To take</button><button type="button" data-v="remember">Remember</button></div>
+            <input type="date" id="ml-due" aria-label="Due date (optional)" style="width:auto;flex:1 1 150px">
+            <button class="btn primary"><svg class="icon"><use href="#i-plus"/></svg>Add</button>
+          </div>
+        </form>
+      </div>
+      <div class="chips" id="ml-chips" role="toolbar" aria-label="Filter"></div>
+      <div id="ml-list" style="display:grid;gap:14px"></div>
     </section>
   </main>
   <button class="fab" id="fab" aria-label="Log an issue" hidden><svg class="icon"><use href="#i-plus"/></svg></button>
@@ -151,6 +173,7 @@
         <div class="field"><span>Photo</span><div class="row"><div class="thumb" id="it-thumb"><svg class="icon"><use href="#i-image"/></svg></div><label class="btn small" style="position:relative">Choose<input type="file" id="it-photo" accept="image/*" style="position:absolute;inset:0;opacity:0"></label></div></div>
       </div>
     </div>
+    <p class="muted" id="it-meta" style="margin:0 20px 8px;font-size:.85rem" hidden></p>
     <div class="sheet-foot">
       <button type="button" class="btn ghost danger" id="it-delete" hidden>Delete</button><span class="spacer"></span>
       <button type="button" class="btn ghost" data-close>Cancel</button>
@@ -165,10 +188,7 @@
     <div class="sheet-head"><h2 id="start-title">Start a changeover</h2><button type="button" class="btn ghost icon-only" data-close aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button></div>
     <div class="sheet-body">
       <div class="choice" id="start-choice"></div>
-      <div class="two">
-        <label class="field"><span>Date</span><input type="date" id="start-date" required></label>
-        <label class="field"><span>Done by</span><input type="text" id="start-by" placeholder="Your name" autocomplete="name"></label>
-      </div>
+      <label class="field"><span>Date</span><input type="date" id="start-date" required></label>
     </div>
     <div class="sheet-foot"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary">Start checklist</button></div>
   </form>
@@ -184,6 +204,7 @@
         <label class="field"><span>Room</span><input type="text" id="is-room" list="rooms" autocomplete="off"></label>
         <label class="field"><span>Date reported</span><input type="date" id="is-date"></label>
       </div>
+      <label class="switch" id="is-private-row" hidden><input type="checkbox" id="is-private"><span><strong>Only visible to me</strong><small>Cleaners won't see this issue.</small></span></label>
       <div class="field"><span>Priority</span><div class="seg" id="is-pri" role="group" aria-label="Priority"><button type="button" data-v="high">High</button><button type="button" data-v="medium">Medium</button><button type="button" data-v="low">Low</button></div></div>
       <label class="field"><span>Details</span><textarea id="is-notes" placeholder="What happened, who noticed it, anything already tried"></textarea></label>
       <div class="picker">
@@ -206,6 +227,36 @@
       <label class="field"><span>New task</span><input type="text" id="tpl-task" required></label>
       <button class="btn" style="grid-column:1/-1"><svg class="icon"><use href="#i-plus"/></svg>Add task</button>
     </form>
+  </div>
+</dialog>
+
+<!-- Account -->
+<dialog class="sheet" id="d-account" aria-labelledby="account-title">
+  <div class="sheet-head"><h2 id="account-title">Account</h2><button class="btn ghost icon-only" data-close aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button></div>
+  <div class="sheet-body">
+    <p style="margin:0">Signed in as <strong id="acc-name"></strong> <span class="tag" id="acc-role"></span></p>
+    <button class="tool" id="open-people" hidden><svg class="icon"><use href="#i-users"/></svg><span><strong>People</strong><small>Add cleaners, reset passwords</small></span></button>
+    <form id="pw-form" class="picker">
+      <h3 style="font-size:1rem">Change your password</h3>
+      <label class="field"><span>Current password</span><input type="password" id="pw-current" autocomplete="current-password" required></label>
+      <label class="field"><span>New password</span><input type="password" id="pw-next" autocomplete="new-password" minlength="6" required></label>
+      <button class="btn">Change password</button>
+    </form>
+  </div>
+  <div class="sheet-foot"><button class="btn danger" id="signout"><svg class="icon"><use href="#i-out"/></svg>Sign out</button></div>
+</dialog>
+
+<!-- People (owner) -->
+<dialog class="sheet" id="d-people" aria-labelledby="people-title">
+  <div class="sheet-head"><h2 id="people-title">People</h2><button class="btn ghost icon-only" data-close aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button></div>
+  <div class="sheet-body">
+    <p class="muted" style="margin:0">Add someone by name. The first time they sign in with that name, they choose their own password.</p>
+    <form id="people-form" class="two" style="align-items:end">
+      <label class="field"><span>Name</span><input type="text" id="pp-name" required autocapitalize="words"></label>
+      <label class="field"><span>Role</span><select id="pp-role"><option value="staff">Cleaner / helper</option><option value="owner">Owner</option></select></label>
+      <button class="btn primary" style="grid-column:1/-1"><svg class="icon"><use href="#i-plus"/></svg>Add person</button>
+    </form>
+    <div id="people-list" class="people"></div>
   </div>
 </dialog>
 
@@ -238,6 +289,9 @@
   <symbol id="i-out" viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10"/></symbol>
   <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7M6 9.5V20h12V9.5"/></symbol>
   <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="14" r="4"/><path d="m11 11 9-9M17 5l2 2M15 7l2 2"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M6 4h12v16l-6-4-6 4z"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.4 3.3-5.5 6.5-5.5s5.9 2.1 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14.6c2.6.2 4.5 2 5 4.9"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
 </svg>
 
