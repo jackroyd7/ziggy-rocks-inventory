@@ -9,8 +9,8 @@ issues that need sorting. It runs on Vercel and works on phones, where it can be
 - **Changeovers**: start "Owners leaving → guests arriving" or "Guests leaving → owners arriving". Every task
   has a tickbox and each tick is saved with the time. Finishing marks anything unticked as missed.
   The floor plans and a checklist editor are on the same tab.
-- **Issues**: things that need sorting, with room, priority, date, details and photos, moved through
-  open, in progress and resolved.
+- **Issues**: things that need sorting, with room, priority, date, details, photos and a comment thread,
+  moved through open, in progress and resolved.
 
 Everyone signs in with their own name and password, so their name shows on issues they log, changeovers
 they start, tasks they tick and inventory they change. No Claude account is needed.
@@ -53,5 +53,6 @@ stops; photos are kept the same way. Photo scanning needs `ANTHROPIC_API_KEY`.
 
 - `public/`: the app itself (`index.html`, `app.js`, `app.css`), icons and floor plans.
 - `api/`: Vercel functions for sign-in (`login`), reading records (`state`), changing records (`doc`),
-  photos (`photo`) and photo scanning with Claude (`scan`).
+  photos (`photo`), issue comments (`comment`), people (`people`), passwords (`password`) and photo
+  scanning with Claude (`scan`).
 - `lib/`: sign-in, storage and the starting data.

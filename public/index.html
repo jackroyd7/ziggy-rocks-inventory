@@ -13,7 +13,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/app.css?v=402b7392">
+<link rel="stylesheet" href="/app.css?v=63013454">
 </head>
 <body>
 
@@ -225,15 +225,6 @@
   <div class="sheet-body">
     <p style="margin:0">Signed in as <strong id="acc-name"></strong> <span class="tag" id="acc-role"></span></p>
     <button class="tool" id="open-people" hidden><svg class="icon"><use href="#i-users"/></svg><span><strong>People</strong><small>Add cleaners, reset passwords</small></span></button>
-    <div class="picker" id="hdr-photo-box" hidden>
-      <h3 style="font-size:1rem">Header photo</h3>
-      <p class="muted" style="margin:0;font-size:.9rem">Shown behind "Ziggy Rocks" at the top of the app, for everyone.</p>
-      <div class="row">
-        <label class="btn" style="position:relative"><svg class="icon"><use href="#i-image"/></svg><span id="hdr-photo-label">Choose photo</span><input type="file" id="hdr-photo" accept="image/*" style="position:absolute;inset:0;opacity:0"></label>
-        <button type="button" class="btn ghost danger" id="hdr-photo-remove" hidden>Remove</button>
-      </div>
-      <label class="field" id="hdr-focus-row" hidden><span>Which part of the photo to show</span><input type="range" id="hdr-focus" min="0" max="100" step="1"></label>
-    </div>
     <form id="pw-form" class="picker">
       <h3 style="font-size:1rem">Change your password</h3>
       <label class="field"><span>Current password</span><input type="password" id="pw-current" autocomplete="current-password" placeholder="Leave blank if you have none"></label>
@@ -290,9 +281,10 @@
   <symbol id="i-pin" viewBox="0 0 24 24"><path d="M6 4h12v16l-6-4-6 4z"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.4 3.3-5.5 6.5-5.5s5.9 2.1 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14.6c2.6.2 4.5 2 5 4.9"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12 20 4l-5 16-3-7z"/><path d="m12 13 8-9"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
 </svg>
 
-<script src="/app.js?v=402b7392" type="module"></script>
+<script src="/app.js?v=63013454" type="module"></script>
 </body>
 </html>
