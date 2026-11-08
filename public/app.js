@@ -568,7 +568,6 @@ async function showApp() {
   $("#login").hidden = true; $("#app").hidden = false; route();
   try { await refresh(); } catch (e) { if ($("#login").hidden) toast(e.message); }
 }
-document.querySelectorAll(".top, .login").forEach(el => el.prepend($("#strata-tpl").content.cloneNode(true)));
 $("#login-back").addEventListener("click", () => { $("#login-name").readOnly = false; setLoginMode("login"); $("#login-name").select(); });
 $("#login-form").addEventListener("submit", async e => {
   e.preventDefault(); $("#login-err").textContent = ""; const btn = $("#login-btn"); btn.disabled = true;
