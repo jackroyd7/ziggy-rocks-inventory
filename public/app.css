@@ -376,3 +376,10 @@ dialog.lightbox .btn { position: fixed; top: calc(12px + env(safe-area-inset-top
 .mini > span { font-size: .75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .mini select { min-height: 40px; padding: 6px 10px; background: var(--surface); }
 @media (min-width: 900px) { .mini { flex: 0 1 220px; } }
+
+/* ---------- add a task to a changeover ---------- */
+.add-task { display: grid; gap: 6px; padding: 12px; border: 1.5px dashed var(--line); border-radius: 12px; background: var(--bg); }
+.add-task-row { display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto; gap: 8px; }
+.add-task select, .add-task input { min-height: 42px; background: var(--surface); }
+.add-task small { font-size: .8rem; }
+@media (max-width: 560px) { .add-task-row { grid-template-columns: minmax(0, 1fr) auto; } .add-task-row select { grid-column: 1 / -1; } }

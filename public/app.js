@@ -304,6 +304,7 @@ function coCard(c) {
         ${finished ? `<span class="row"><span class="muted" style="font-size:.88rem">Finished ${esc(fmtTime(c.finishedAt))}</span><button class="btn ghost small" data-reopen>Reopen</button></span>` : ""}
       </div>
       ${rooms ? `<div class="rooms">${rooms}</div>` : `<div class="empty" style="padding:16px">${icon("check")}<p>Every task is ticked.</p></div>`}
+      ${finished ? "" : addTaskForm(c)}
       <label class="field"><span>Notes from this changeover</span><textarea data-notes placeholder="Anything to report? Log damage or repairs in Issues too.">${esc(c.notes)}</textarea></label>
       <div class="field"><span>Comments</span>${commentsBlock(c, "cleans", c.type || "this changeover")}</div>
       <div class="row between">
@@ -332,7 +333,35 @@ function renderCleaning() {
   $("#co-history-title").hidden = !history.length;
   $("#co-history").innerHTML = history.map(coCard).join("");
 }
+// "Add a task" row on a changeover: the task goes into this changeover and into its checklist.
+function addTaskForm(c) {
+  const own = [...new Set((c.tasks || []).map(t => t.room))];
+  const rooms = [...own, ...ROOMS.filter(r => !own.includes(r))];
+  const last = store.get("zr-last-room");
+  return `<form class="add-task" data-addtask>
+    <div class="add-task-row">
+      <select aria-label="Room">${rooms.map(r => `<option${r === last ? " selected" : ""}>${esc(r)}</option>`).join("")}</select>
+      <input type="text" placeholder="Add a task" aria-label="New task" maxlength="300">
+      <button class="btn primary small">${icon("plus")}Add</button>
+    </div>
+    <small class="muted">Also saved to the "${esc(c.type || "changeover")}" checklist for future changeovers.</small>
+  </form>`;
+}
 function coFromEvent(e) { const card = e.target.closest(".changeover"); return card && S.cleans.find(c => c.id === card.dataset.id); }
+$("#co-active").addEventListener("submit", async e => {
+  if (!e.target.matches("[data-addtask]")) return; e.preventDefault();
+  const c = coFromEvent(e); if (!c) return;
+  const room = e.target.querySelector("select").value, input = e.target.querySelector("input"), task = input.value.trim();
+  if (!task) { input.focus(); return; }
+  const btn = e.target.querySelector("button"); btn.disabled = true;
+  try {
+    const r = await api("/api/addtask", { method: "POST", body: { cleanId: c.id, room, task } });
+    store.set("zr-last-room", room); input.value = ""; input.blur(); // let the list redraw straight away
+    await refresh();
+    toast(r.savedToChecklist ? `Added to ${room}, and to the checklist for next time.` : `Added to ${room}.`);
+    document.querySelector(`.changeover[data-id="${c.id}"] [data-addtask] input`)?.focus();
+  } catch (err) { toast(err.message); } finally { btn.disabled = false; }
+});
 for (const sel of ["#co-active", "#co-history"]) {
   $(sel).addEventListener("click", async e => {
     const c = coFromEvent(e); if (!c) return;
@@ -369,7 +398,7 @@ $("#start-form").addEventListener("submit", async e => {
   const cl = S.checklists.find(c => c.id === new FormData(e.target).get("cl")); if (!cl) return;
   const by = S.me?.name || "";
   const id = newId(); ui.open.add(id); $("#d-start").close();
-  await save("set", "cleans", id, { type: cl.name, date: $("#start-date").value || today(), by, notes: "", createdAt: Date.now(), tasks: cl.tasks.map(t => ({ room: t.room, task: t.task, done: false })) }).catch(() => {});
+  await save("set", "cleans", id, { type: cl.name, checklistId: cl.id, date: $("#start-date").value || today(), by, notes: "", createdAt: Date.now(), tasks: cl.tasks.map(t => ({ room: t.room, task: t.task, done: false })) }).catch(() => {});
   document.querySelector(`.changeover[data-id="${id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
