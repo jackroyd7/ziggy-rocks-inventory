@@ -21,6 +21,23 @@ they start, tasks they tick and inventory they change. No Claude account is need
 - **Owner only**: issues marked "Only visible to me", and the **My list** tab for private reminders, jobs and
   things to take to the house.
 
+## Working offline
+
+The app keeps working without signal:
+
+- **Opening offline:** once it has been opened online, it opens offline too, showing the data from the last
+  time it had signal.
+- **Saving offline:** changes are saved on the device in an outbox and show straight away. That covers ticking
+  tasks, adding tasks, logging and updating issues, comments, inventory edits, My list and photos. A bar at the
+  top says how many are waiting.
+- **Back online:** the outbox sends in order. Photos upload first, then the records that use them, and the app
+  catches up with everyone else's changes.
+- **Ticks:** they're saved one task at a time, so two people ticking the same changeover never undo each other.
+- **Still needs signal:** photo scanning with Claude, signing in, and the People and password screens.
+
+A service worker (`public/sw.js`) keeps the app's files and photos on the device. The outbox, the photos
+waiting to upload and the saved copy of the data are kept in IndexedDB.
+
 ## Deploy on Vercel
 
 1. In Vercel, choose **Add New → Project** and import this GitHub repository. Leave the framework as **Other**
@@ -53,6 +70,6 @@ stops; photos are kept the same way. Photo scanning needs `ANTHROPIC_API_KEY`.
 
 - `public/`: the app itself (`index.html`, `app.js`, `app.css`), icons and floor plans.
 - `api/`: Vercel functions for sign-in (`login`), reading records (`state`), changing records (`doc`),
-  photos (`photo`), issue comments (`comment`), people (`people`), passwords (`password`) and photo
+  photos (`photo`), comments (`comment`), ticks (`tick`), new changeover tasks (`addtask`), people (`people`), passwords (`password`) and photo
   scanning with Claude (`scan`).
 - `lib/`: sign-in, storage and the starting data.

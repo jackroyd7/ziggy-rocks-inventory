@@ -23,7 +23,13 @@ export const POST = protect(async (request, me) => {
   }
   const body = String(text || "").trim().slice(0, 2000);
   if (!body) return json({ error: "Write a comment first." }, 400);
-  const comment = { id: randomBytes(6).toString("hex"), by: me.id, at: new Date().toISOString(), text: body };
+  // The phone picks the comment's id and time, so a comment written offline keeps its time,
+  // and sending the same comment twice (after a dropped connection) only saves it once.
+  const id = /^[A-Za-z0-9]{6,32}$/.test(body0.cid || "") ? body0.cid : randomBytes(6).toString("hex");
+  if (comments.some(c => c.id === id)) return json({ comment: comments.find(c => c.id === id) });
+  const when = Date.parse(body0.at);
+  const at = new Date(Number.isFinite(when) && when <= Date.now() + 5 * 60e3 ? when : Date.now()).toISOString();
+  const comment = { id, by: me.id, at, text: body };
   await update(collection, issueId, { comments: [...comments, comment], updatedBy: me.id, updatedAt: Date.now() });
   return json({ comment });
 });
