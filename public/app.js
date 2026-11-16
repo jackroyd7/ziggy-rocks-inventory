@@ -398,15 +398,38 @@ $("#tpl-form").addEventListener("submit", e => {
 $("#open-plans").addEventListener("click", () => openSheet("#d-plans"));
 
 /* ---------------- issues ---------------- */
+// Sort and filter choices for the Issues tab, remembered on this device.
+const issueView = (() => { try { return { sort: "priority", pri: "", by: "", ...JSON.parse(store.get("zr-issue-view") || "{}") }; } catch { return { sort: "priority", pri: "", by: "" }; } })();
+const saveIssueView = () => store.set("zr-issue-view", JSON.stringify(issueView));
+const SORTS = {
+  priority: (a, b) => (PRI[a.priority] ?? 1) - (PRI[b.priority] ?? 1) || (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0),
+  newest: (a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0),
+  oldest: (a, b) => (a.date || "").localeCompare(b.date || "") || (a.createdAt || 0) - (b.createdAt || 0),
+  updated: (a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0),
+};
+function renderIssueTools() {
+  // "Logged by" lists everyone who has logged an issue, plus anything with no name recorded.
+  const ids = [...new Set(S.issues.map(i => i.createdBy || ""))];
+  const named = ids.filter(Boolean).map(id => [id, id === S.me?.id ? `${nameOf(id) || "Me"} (me)` : nameOf(id) || "Someone"]).sort((a, b) => a[1].localeCompare(b[1]));
+  const opts = [["", "Everyone"], ...named, ...(ids.includes("") ? [["none", "No name recorded"]] : [])];
+  if (issueView.by && !opts.some(([v]) => v === issueView.by)) issueView.by = "";
+  $("#is-fby").innerHTML = opts.map(([v, l]) => `<option value="${esc(v)}"${v === issueView.by ? " selected" : ""}>${esc(l)}</option>`).join("");
+  if (!SORTS[issueView.sort]) issueView.sort = "priority";
+  $("#is-sort").value = issueView.sort; $("#is-fpri").value = issueView.pri;
+  $("#is-clear").hidden = !issueView.pri && !issueView.by;
+}
+const matchesIssueFilters = i => (!issueView.pri || i.priority === issueView.pri) && (!issueView.by || (issueView.by === "none" ? !i.createdBy : i.createdBy === issueView.by));
 function renderIssues() {
-  const counts = { active: 0, "in-progress": 0, resolved: 0, all: S.issues.length };
-  for (const i of S.issues) { if (i.status !== "resolved") counts.active++; if (i.status === "in-progress") counts["in-progress"]++; if (i.status === "resolved") counts.resolved++; }
+  renderIssueTools();
+  const pool = S.issues.filter(matchesIssueFilters);
+  const counts = { active: 0, "in-progress": 0, resolved: 0, all: pool.length };
+  for (const i of pool) { if (i.status !== "resolved") counts.active++; if (i.status === "in-progress") counts["in-progress"]++; if (i.status === "resolved") counts.resolved++; }
   $("#issue-chips").innerHTML = [["active", "Open"], ["in-progress", "In progress"], ["resolved", "Resolved"], ["all", "All"]]
     .map(([k, l]) => `<button class="chip" data-f="${k}" aria-pressed="${ui.issueFilter === k}">${l} <span class="c">${counts[k]}</span></button>`).join("");
-  const list = S.issues.filter(i => ui.issueFilter === "all" || (ui.issueFilter === "active" ? i.status !== "resolved" : i.status === ui.issueFilter))
-    .sort((a, b) => (a.status === "resolved") - (b.status === "resolved") || (PRI[a.priority] ?? 1) - (PRI[b.priority] ?? 1) || (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0));
+  const list = pool.filter(i => ui.issueFilter === "all" || (ui.issueFilter === "active" ? i.status !== "resolved" : i.status === ui.issueFilter))
+    .sort((a, b) => (ui.issueFilter === "all" ? (a.status === "resolved") - (b.status === "resolved") : 0) || SORTS[issueView.sort](a, b));
   const box = $("#issue-list");
-  if (!list.length) { box.innerHTML = `<div class="card empty">${icon("check")}<p>${S.issues.length ? "Nothing here." : "<strong>No issues logged.</strong><br>Log anything that needs fixing, replacing or deciding."}</p></div>`; return; }
+  if (!list.length) { box.innerHTML = `<div class="card empty">${icon("check")}<p>${S.issues.length ? (issueView.pri || issueView.by ? "No issues match these filters." : "Nothing here.") : "<strong>No issues logged.</strong><br>Log anything that needs fixing, replacing or deciding."}</p></div>`; return; }
   box.innerHTML = list.map(i => `
     <article class="card issue p-${esc(i.priority)} s-${esc(i.status)}" data-id="${esc(i.id)}">
       <div class="in">
@@ -455,6 +478,8 @@ document.addEventListener("click", e => {
       .then(() => { t.rec.comments = (t.rec.comments || []).filter(c => c.id !== cid); renderAll(); }).catch(err => toast(err.message));
   }
 });
+for (const [sel, key] of [["#is-sort", "sort"], ["#is-fpri", "pri"], ["#is-fby", "by"]]) $(sel).addEventListener("change", e => { issueView[key] = e.target.value; saveIssueView(); renderIssues(); });
+$("#is-clear").addEventListener("click", () => { issueView.pri = ""; issueView.by = ""; saveIssueView(); renderIssues(); });
 $("#issue-chips").addEventListener("click", e => { const c = e.target.closest("[data-f]"); if (c) { ui.issueFilter = c.dataset.f; renderIssues(); } });
 $("#issue-list").addEventListener("click", e => {
   const card = e.target.closest(".issue"); if (!card) return; const it = S.issues.find(i => i.id === card.dataset.id); if (!it) return;

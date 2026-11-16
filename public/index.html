@@ -13,7 +13,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/app.css?v=ab21c10c">
+<link rel="stylesheet" href="/app.css?v=0b976415">
 </head>
 <body>
 
@@ -99,6 +99,19 @@
       <div class="row between issues-bar">
         <div class="chips" id="issue-chips" role="toolbar" aria-label="Filter issues"></div>
         <button class="btn primary" id="open-issue"><svg class="icon"><use href="#i-plus"/></svg>Log an issue</button>
+      </div>
+      <div class="issue-tools">
+        <label class="mini"><span>Sort</span><select id="is-sort">
+          <option value="priority">Priority, high first</option>
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="updated">Recently updated</option>
+        </select></label>
+        <label class="mini"><span>Priority</span><select id="is-fpri">
+          <option value="">All priorities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
+        </select></label>
+        <label class="mini"><span>Logged by</span><select id="is-fby"></select></label>
+        <button type="button" class="btn ghost small" id="is-clear" hidden>Clear filters</button>
       </div>
       <div id="issue-list" style="display:grid;gap:12px"><div class="skeleton"></div></div>
     </section>
@@ -286,6 +299,6 @@
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
 </svg>
 
-<script src="/app.js?v=ab21c10c" type="module"></script>
+<script src="/app.js?v=0b976415" type="module"></script>
 </body>
 </html>
