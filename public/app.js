@@ -24,36 +24,188 @@ const ui = { room: "All", search: "", issueFilter: "active", open: new Set(), on
 
 /* ---------------- server ---------------- */
 async function api(path, { method = "GET", body, raw, type } = {}) {
-  const res = await fetch(path, {
-    method, credentials: "same-origin",
-    headers: raw ? { "content-type": type } : body ? { "content-type": "application/json" } : {},
-    body: raw ?? (body ? JSON.stringify(body) : undefined),
-  });
-  if (res.status === 401 && path !== "/api/login" && path !== "/api/password") { showLogin(); throw new Error("Sign in to continue."); }
+  let res;
+  try {
+    res = await fetch(path, {
+      method, credentials: "same-origin",
+      headers: raw ? { "content-type": type } : body ? { "content-type": "application/json" } : {},
+      body: raw ?? (body ? JSON.stringify(body) : undefined),
+    });
+  } catch {
+    setOnline(false);
+    throw Object.assign(new Error("You're offline. This needs signal, so try again when you're back online."), { offline: true });
+  }
+  if (res.status === 401 && path !== "/api/login" && path !== "/api/password") { showLogin(); throw Object.assign(new Error("Sign in to continue."), { status: 401 }); }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Something went wrong. Check your connection and try again.");
+  if (!res.ok) throw Object.assign(new Error(data.error || "Something went wrong. Check your connection and try again."), { status: res.status });
+  setOnline(true);
   return data;
+}
+
+/* ---------------- offline: a copy on this device, an outbox, and syncing ----------------
+   Every change goes into an "outbox" kept on the device (IndexedDB) and shows straight away. The outbox
+   is sent to the server in order whenever there's signal. Photos taken without signal wait in it too,
+   and upload before the records that use them. A copy of the last data lets the app open offline. */
+const idb = (() => {
+  let dbp = null;
+  const open = () => (dbp ||= new Promise((ok, fail) => {
+    const r = indexedDB.open("ziggy-rocks", 1);
+    r.onupgradeneeded = () => { const d = r.result; d.createObjectStore("outbox", { keyPath: "seq", autoIncrement: true }); d.createObjectStore("photos"); d.createObjectStore("kv"); };
+    r.onsuccess = () => ok(r.result); r.onerror = () => fail(r.error);
+  }));
+  const run = async (name, mode, fn) => { const st = (await open()).transaction(name, mode).objectStore(name); return new Promise((ok, fail) => { const q = fn(st); q.onsuccess = () => ok(q.result); q.onerror = () => fail(q.error); }); };
+  return {
+    get: (n, k) => run(n, "readonly", st => st.get(k)), all: n => run(n, "readonly", st => st.getAll()), keys: n => run(n, "readonly", st => st.getAllKeys()),
+    put: (n, v, k) => run(n, "readwrite", st => (k === undefined ? st.put(v) : st.put(v, k))), add: (n, v) => run(n, "readwrite", st => st.add(v)), del: (n, k) => run(n, "readwrite", st => st.delete(k)),
+  };
+})();
+// If the browser won't allow IndexedDB (some private modes), fall back to memory for this visit.
+const mem = { outbox: [], seq: 0, photos: new Map(), kv: new Map() };
+const tryIdb = async (fn, fallback) => { try { return await fn(); } catch { return fallback(); } };
+const outbox = {
+  all: () => tryIdb(() => idb.all("outbox"), () => [...mem.outbox]),
+  add: op => tryIdb(() => idb.add("outbox", op), () => { op.seq = ++mem.seq; mem.outbox.push(op); return op.seq; }),
+  put: op => tryIdb(() => idb.put("outbox", op), () => { const k = mem.outbox.findIndex(o => o.seq === op.seq); if (k >= 0) mem.outbox[k] = op; }),
+  del: seq => tryIdb(() => idb.del("outbox", seq), () => { mem.outbox = mem.outbox.filter(o => o.seq !== seq); }),
+};
+const photoStore = {
+  put: (k, b) => tryIdb(() => idb.put("photos", b, k), () => mem.photos.set(k, b)), get: k => tryIdb(() => idb.get("photos", k), () => mem.photos.get(k)),
+  del: k => tryIdb(() => idb.del("photos", k), () => mem.photos.delete(k)), keys: () => tryIdb(() => idb.keys("photos"), () => [...mem.photos.keys()]),
+};
+const kv = { get: k => tryIdb(() => idb.get("kv", k), () => mem.kv.get(k)), put: (k, v) => tryIdb(() => idb.put("kv", v, k), () => mem.kv.set(k, v)) };
+
+let online = navigator.onLine !== false, pendingCount = 0, lastSynced = 0;
+const myOps = async () => (await outbox.all()).filter(o => o.user === S.me?.id);
+
+// Photos still waiting to upload are shown from the device ("local:..." addresses).
+const localUrls = new Map();
+const swapped = new Map(); // local address -> uploaded address, for changes made just after an upload
+const photoSrc = url => (url && url.startsWith("local:") ? localUrls.get(url) || "" : url || "");
+async function loadLocalPhotos() { for (const k of await photoStore.keys()) { if (localUrls.has(k)) continue; const b = await photoStore.get(k); if (b) localUrls.set(k, URL.createObjectURL(b)); } }
+
+const taskIndex = (tasks, op) => (tasks[op.i] && tasks[op.i].room === op.room && tasks[op.i].task === op.task ? op.i : tasks.findIndex(t => t.room === op.room && t.task === op.task));
+// Apply a change to a copy of the data. Used straight away, and again on fresh server data while it's still unsent.
+function applyLocal(op, st) {
+  const find = (col, id) => (st[col] || []).find(x => x.id === id);
+  if (op.kind === "doc") {
+    const { collection, id, data } = op;
+    if (collection === "config") { if (id === "template") st.checklists = data.checklists; return; }
+    const list = st[collection] || (st[collection] = []); const k = list.findIndex(x => x.id === id);
+    if (op.op === "delete") { if (k >= 0) list.splice(k, 1); }
+    else if (op.op === "set") { const rec = { ...data, id, createdBy: list[k]?.createdBy ?? op.user }; k >= 0 ? (list[k] = rec) : list.push(rec); }
+    else if (k >= 0) list[k] = { ...list[k], ...data, updatedBy: op.user };
+  } else if (op.kind === "tick") {
+    const c = find("cleans", op.cleanId); if (!c?.tasks) return;
+    const k = taskIndex(c.tasks, op); if (k < 0) return;
+    c.tasks[k] = { ...c.tasks[k], done: op.done, doneAt: op.done ? op.doneAt : null, doneBy: op.done ? op.user : null };
+  } else if (op.kind === "comment") {
+    const r = find(op.collection, op.id); if (!r) return;
+    r.comments = r.comments || []; if (!r.comments.some(c => c.id === op.cid)) r.comments.push({ id: op.cid, by: op.user, at: op.at, text: op.text });
+  } else if (op.kind === "uncomment") {
+    const r = find(op.collection, op.id); if (r) r.comments = (r.comments || []).filter(c => c.id !== op.cid);
+  } else if (op.kind === "addtask") {
+    const norm = x => String(x || "").trim().replace(/\s+/g, " ").toLowerCase();
+    const same = t => norm(t.room) === norm(op.room) && norm(t.task) === norm(op.task);
+    const c = find("cleans", op.cleanId); if (!c) return;
+    c.tasks = c.tasks || []; if (!c.tasks.some(same)) c.tasks.push({ room: op.room, task: op.task, done: false, addedBy: op.user });
+    const cl = (st.checklists || []).find(x => (c.checklistId && x.id === c.checklistId) || x.name === c.type);
+    if (cl && !cl.tasks.some(same)) cl.tasks.push({ id: op.tid, room: op.room, task: op.task });
+  }
+}
+
+function persistState() {
+  if (!S.me) return;
+  kv.put("state:" + S.me.id, { state: JSON.parse(JSON.stringify(S)), at: lastSynced }).catch(() => {});
+  kv.put("lastUser", S.me.id).catch(() => {});
+}
+async function loadCache() {
+  const uid = await kv.get("lastUser"); const c = uid && (await kv.get("state:" + uid));
+  if (!c?.state?.me) return false;
+  Object.assign(S, c.state); lastSynced = c.at || 0; loaded = true; return true;
 }
 
 async function refresh() {
   const d = await api("/api/state");
-  Object.assign(S, d); loaded = true;
-  renderAll();
+  for (const op of (await outbox.all()).filter(o => o.user === d.me.id)) applyLocal(op, d); // keep unsent changes on screen
+  Object.assign(S, d); loaded = true; lastSynced = Date.now();
+  persistState(); renderAll(); recount();
 }
 
-// Change one record: update the screen straight away, then save.
-async function save(op, collection, id, data) {
-  const listName = collection === "config" ? null : collection;
-  if (listName) {
-    const list = S[listName]; const i = list.findIndex(x => x.id === id);
-    if (op === "delete") { if (i >= 0) list.splice(i, 1); }
-    else if (op === "set") { const rec = { id, ...data }; i >= 0 ? (list[i] = rec) : list.push(rec); }
-    else if (i >= 0) list[i] = { ...list[i], ...data };
-  } else if (id === "template") S.checklists = data.checklists;
-  renderAll();
-  try { await api("/api/doc", { method: "POST", body: { op, collection, id, data } }); }
-  catch (e) { toast(e.message); refresh().catch(() => {}); throw e; }
+// Record a change: show it now, keep it in the outbox, and send it when there's signal.
+async function queue(op) {
+  let text = JSON.stringify({ ...op, user: S.me?.id, at: op.at || new Date().toISOString() });
+  for (const [l, u] of swapped) if (text.includes(l)) text = text.split(l).join(u);
+  const entry = JSON.parse(text);
+  applyLocal(entry, S); renderAll();
+  await outbox.add(entry);
+  persistState(); await recount(); flush();
 }
+const save = (op, collection, id, data) => queue({ kind: "doc", op, collection, id, data });
+
+async function recount() { pendingCount = (await myOps()).length; updateSyncBar(); }
+function setOnline(v) { if (online === v) return; online = v; updateSyncBar(); if (v && loaded) flush(); }
+
+let flushing = null;
+function flush() {
+  if (!S.me) return Promise.resolve();
+  return (flushing ||= drain().catch(() => {}).finally(() => { flushing = null; recount(); }));
+}
+async function send(op) {
+  switch (op.kind) {
+    case "doc": return api("/api/doc", { method: "POST", body: { op: op.op, collection: op.collection, id: op.id, data: op.data } });
+    case "tick": return api("/api/tick", { method: "POST", body: { cleanId: op.cleanId, i: op.i, room: op.room, task: op.task, done: op.done, doneAt: op.doneAt } });
+    case "comment": return api("/api/comment", { method: "POST", body: { collection: op.collection, id: op.id, cid: op.cid, text: op.text, at: op.at } });
+    case "uncomment": return api("/api/comment", { method: "POST", body: { collection: op.collection, id: op.id, remove: op.cid } });
+    case "addtask": return api("/api/addtask", { method: "POST", body: { cleanId: op.cleanId, room: op.room, task: op.task } });
+    case "photo": { const blob = await photoStore.get(op.local); if (!blob) return { url: "" }; return api("/api/photo", { method: "POST", raw: blob, type: "image/jpeg" }); }
+    case "delphoto": return api("/api/photo?url=" + encodeURIComponent(op.url), { method: "DELETE" });
+    default: return {};
+  }
+}
+// Once a photo has uploaded, point everything at its real address.
+async function swapLocal(local, url) {
+  swapped.set(local, url);
+  for (const o of await outbox.all()) { const t = JSON.stringify(o); if (t.includes(local)) await outbox.put(JSON.parse(t.split(local).join(url))); }
+  const t = JSON.stringify(S); if (t.includes(local)) Object.assign(S, JSON.parse(t.split(local).join(url)));
+  await photoStore.del(local);
+  const obj = localUrls.get(local); localUrls.delete(local); if (obj) setTimeout(() => URL.revokeObjectURL(obj), 60000);
+  persistState();
+}
+async function drain() {
+  let sent = 0;
+  for (;;) {
+    const op = (await myOps())[0];
+    if (!op) break;
+    updateSyncBar(true);
+    let res;
+    try { res = await send(op); }
+    catch (e) {
+      if (e.offline || e.status === 401 || e.status === 429 || (e.status || 500) >= 500) return; // try again later
+      // The server refused this change (for example, the record was deleted): drop it and carry on.
+      if (op.kind === "photo") await swapLocal(op.local, "");
+      await outbox.del(op.seq);
+      toast(`One change couldn't be saved: ${e.message}`);
+      continue;
+    }
+    if (op.kind === "photo") await swapLocal(op.local, res?.url || "");
+    await outbox.del(op.seq); sent++;
+  }
+  if (sent) await refresh().catch(() => {}); // catch up with everyone else's changes
+}
+
+function updateSyncBar(sending = false) {
+  const bar = $("#syncbar"); if (!bar) return;
+  const n = pendingCount;
+  if (!online) {
+    bar.hidden = false; bar.className = "syncbar off";
+    bar.innerHTML = `${icon("cloud-off")}<span><strong>You're offline.</strong> ${n ? `${plural(n, "change")} saved on this device, sending when you're back online.` : "Keep working: changes send when you're back online."}${lastSynced ? ` <span class="muted">Last updated ${esc(fmtTime(new Date(lastSynced).toISOString()))}.</span>` : ""}</span>`;
+  } else if (n) {
+    bar.hidden = false; bar.className = "syncbar busy";
+    bar.innerHTML = `<span class="spinner sm" aria-hidden="true"></span><span>${sending || flushing ? "Sending" : "Waiting to send"} ${plural(n, "change")}…</span>`;
+  } else bar.hidden = true;
+}
+addEventListener("online", () => { setOnline(true); if (loaded) flush().then(() => refresh().catch(() => {})); });
+addEventListener("offline", () => setOnline(false));
 
 async function shrink(file, max = 1600, quality = 0.82) {
   try {
@@ -64,12 +216,22 @@ async function shrink(file, max = 1600, quality = 0.82) {
     return await new Promise((ok, fail) => c.toBlob(b => b ? ok(b) : fail(new Error("Couldn't read that photo.")), "image/jpeg", quality));
   } catch { throw new Error("Couldn't read that photo. Try a JPEG or PNG."); }
 }
+// Photos are kept on the device first and uploaded through the outbox, so they work without signal.
 async function uploadPhoto(file) {
   const blob = await shrink(file);
-  const { url } = await api("/api/photo", { method: "POST", raw: blob, type: "image/jpeg" });
-  return url;
+  const local = "local:" + newId();
+  await photoStore.put(local, blob); localUrls.set(local, URL.createObjectURL(blob));
+  await queue({ kind: "photo", local });
+  return swapped.get(local) ?? local;
 }
-const deletePhoto = url => api("/api/photo?url=" + encodeURIComponent(url), { method: "DELETE" }).catch(() => {});
+async function deletePhoto(url) {
+  if (!url) return;
+  if (url.startsWith("local:")) {
+    for (const o of await outbox.all()) if (o.kind === "photo" && o.local === url) await outbox.del(o.seq);
+    await photoStore.del(url); localUrls.delete(url); recount(); return;
+  }
+  return queue({ kind: "delphoto", url });
+}
 const toBase64 = blob => new Promise(ok => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(",")[1]); r.readAsDataURL(blob); });
 
 /* ---------------- small UI helpers ---------------- */
@@ -87,7 +249,7 @@ function showPhoto(src) { const d = $("#d-photo"); d.querySelector("img").src = 
 function segment(el, value) { el.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === value))); el.dataset.value = value; }
 $$(".seg[id]").forEach(el => el.addEventListener("click", e => { const b = e.target.closest("button[data-v]"); if (b) segment(el, b.dataset.v); }));
 function previews(files, el) { el.innerHTML = ""; for (const f of files) { const img = document.createElement("img"); img.src = URL.createObjectURL(f); img.alt = ""; el.append(img); } }
-const thumb = (url, label = "") => url ? `<button class="thumb" data-zoom data-src="${esc(url)}" aria-label="View photo ${esc(label)}"><img src="${esc(url)}" alt="" loading="lazy"></button>` : `<div class="thumb">${icon("image")}</div>`;
+const thumb = (url, label = "") => { const src = photoSrc(url); return src ? `<button class="thumb" data-zoom data-src="${esc(src)}" aria-label="View photo ${esc(label)}"><img src="${esc(src)}" alt="" loading="lazy"></button>` : `<div class="thumb">${icon("image")}</div>`; };
 // Don't redraw a list someone is typing in; catch up once they leave it.
 const deferred = new Set();
 function safely(container, fn) {
@@ -173,7 +335,7 @@ function openItem(it = null) {
   $("#it-item").value = it?.item || ""; $("#it-room").value = it?.room || (ui.room !== "All" ? ui.room : "");
   $("#it-qty").value = it?.qty ?? 1; $("#it-notes").value = it?.notes || ""; $("#it-checked").value = it?.checked || today();
   segment($("#it-cond"), it?.condition || "Good");
-  $("#it-thumb").innerHTML = it?.photo ? `<img src="${esc(it.photo)}" alt="">` : icon("image");
+  $("#it-thumb").innerHTML = photoSrc(it?.photo) ? `<img src="${esc(photoSrc(it.photo))}" alt="">` : icon("image");
   $("#it-photo").value = ""; $("#it-delete").hidden = !it;
   const added = it && nameOf(it.createdBy), changed = it && nameOf(it.updatedBy);
   $("#it-meta").hidden = !(added || changed);
@@ -234,7 +396,7 @@ $("#scan-go").addEventListener("click", async () => {
     if (!scanRows.length) { toast("Claude couldn't find any inventory items. Try a closer, brighter photo."); scanStep("setup"); return; }
     $("#scan-summary").textContent = `Found ${plural(scanRows.length, "kind")} of item in ${room}. Untick anything wrong and fix the counts.`;
     renderScanRows(); scanStep("result");
-  } catch (e) { toast(e.message); scanStep("setup"); }
+  } catch (e) { toast(e.offline ? "Photo scanning needs signal. Add items by hand for now, or scan when you're back online." : e.message); scanStep("setup"); }
   finally { scanBusy = false; }
 });
 function renderScanRows() {
@@ -351,16 +513,12 @@ function coFromEvent(e) { const card = e.target.closest(".changeover"); return c
 $("#co-active").addEventListener("submit", async e => {
   if (!e.target.matches("[data-addtask]")) return; e.preventDefault();
   const c = coFromEvent(e); if (!c) return;
-  const room = e.target.querySelector("select").value, input = e.target.querySelector("input"), task = input.value.trim();
+  const room = e.target.querySelector("select").value, input = e.target.querySelector("input"), task = input.value.trim().replace(/\s+/g, " ");
   if (!task) { input.focus(); return; }
-  const btn = e.target.querySelector("button"); btn.disabled = true;
-  try {
-    const r = await api("/api/addtask", { method: "POST", body: { cleanId: c.id, room, task } });
-    store.set("zr-last-room", room); input.value = ""; input.blur(); // let the list redraw straight away
-    await refresh();
-    toast(r.savedToChecklist ? `Added to ${room}, and to the checklist for next time.` : `Added to ${room}.`);
-    document.querySelector(`.changeover[data-id="${c.id}"] [data-addtask] input`)?.focus();
-  } catch (err) { toast(err.message); } finally { btn.disabled = false; }
+  store.set("zr-last-room", room); input.value = ""; input.blur(); // let the list redraw straight away
+  await queue({ kind: "addtask", cleanId: c.id, room, task, tid: newId() });
+  toast(`Added to ${room}, and to the checklist for next time.`);
+  document.querySelector(`.changeover[data-id="${c.id}"] [data-addtask] input`)?.focus();
 });
 for (const sel of ["#co-active", "#co-history"]) {
   $(sel).addEventListener("click", async e => {
@@ -369,9 +527,8 @@ for (const sel of ["#co-active", "#co-history"]) {
     const only = e.target.closest("[data-only]"); if (only) { only.dataset.only === "1" ? ui.onlyLeft.add(c.id) : ui.onlyLeft.delete(c.id); renderCleaning(); return; }
     const task = e.target.closest(".task");
     if (task) {
-      const i = Number(task.dataset.i); const now = new Date().toISOString();
-      const tasks = c.tasks.map((t, j) => j === i ? { ...t, done: !t.done, doneAt: !t.done ? now : null, doneBy: !t.done ? S.me?.id : null } : t);
-      save("update", "cleans", c.id, { tasks }).catch(() => {});
+      const i = Number(task.dataset.i); const t = c.tasks[i]; const done = !t.done;
+      queue({ kind: "tick", cleanId: c.id, i, room: t.room, task: t.task, done, doneAt: done ? new Date().toISOString() : null });
       if (navigator.vibrate && !c.tasks[i].done) navigator.vibrate(8);
       return;
     }
@@ -466,7 +623,7 @@ function renderIssues() {
           <div class="meta">${i.room ? `<span>${esc(i.room)}</span><span>·</span>` : ""}<span class="tag ${i.priority === "high" ? "bad" : i.priority === "medium" ? "warn" : ""}">${esc(i.priority)} priority</span><span>· ${esc(fmtDate(i.date, { day: "numeric", month: "short" }))}</span>${nameOf(i.createdBy) ? `<span>· by ${esc(nameOf(i.createdBy))}</span>` : ""}${i.private ? `<span class="tag private">${icon("lock", "icon")} Only you</span>` : ""}${i.resolved ? `<span class="tag good">Resolved ${esc(fmtDate(i.resolved, { day: "numeric", month: "short" }))}</span>` : ""}</div></div>
         ${i.notes ? `<p class="notes">${esc(i.notes)}</p>` : ""}
         ${commentsBlock(i, "issues", i.title)}
-        <div class="photos">${(i.photos || []).map(p => thumb(p, i.title)).join("")}<label class="addphoto">${icon("camera")}<input type="file" accept="image/*" multiple data-addphoto aria-label="Add photos to ${esc(i.title)}"></label></div>
+        <div class="photos">${(i.photos || []).filter(Boolean).map(p => thumb(p, i.title)).join("")}<label class="addphoto">${icon("camera")}<input type="file" accept="image/*" multiple data-addphoto aria-label="Add photos to ${esc(i.title)}"></label></div>
         <div class="row between">
           <div class="seg" role="group" aria-label="Status">${STATUS.map(([v, l]) => `<button data-status="${v}" aria-pressed="${i.status === v}">${l}</button>`).join("")}</div>
           <button class="btn ghost small danger" data-del aria-label="Delete ${esc(i.title)}">${icon("trash")}</button>
@@ -490,12 +647,8 @@ document.addEventListener("submit", async e => {
   if (!e.target.matches("[data-commentform]")) return; e.preventDefault();
   const t = commentTarget(e.target); if (!t?.rec) return;
   const input = e.target.querySelector("input"); const text = input.value.trim(); if (!text) return;
-  const btn = e.target.querySelector("button"); btn.disabled = true;
-  try {
-    const { comment } = await api("/api/comment", { method: "POST", body: { collection: t.collection, id: t.id, text } });
-    t.rec.comments = [...(t.rec.comments || []), comment];
-    input.value = ""; input.blur(); renderAll();
-  } catch (err) { toast(err.message); } finally { btn.disabled = false; }
+  input.value = ""; input.blur();
+  queue({ kind: "comment", collection: t.collection, id: t.id, cid: newId().slice(0, 16), text });
 });
 document.addEventListener("click", e => {
   const t = commentTarget(e.target); if (!t?.rec) return;
@@ -503,8 +656,7 @@ document.addEventListener("click", e => {
   const dc = e.target.closest("[data-delcomment]");
   if (dc) {
     const cid = dc.closest("[data-cid]").dataset.cid; if (!confirm("Delete this comment?")) return;
-    api("/api/comment", { method: "POST", body: { collection: t.collection, id: t.id, remove: cid } })
-      .then(() => { t.rec.comments = (t.rec.comments || []).filter(c => c.id !== cid); renderAll(); }).catch(err => toast(err.message));
+    queue({ kind: "uncomment", collection: t.collection, id: t.id, cid });
   }
 });
 for (const [sel, key] of [["#is-sort", "sort"], ["#is-fpri", "pri"], ["#is-fby", "by"]]) $(sel).addEventListener("change", e => { issueView[key] = e.target.value; saveIssueView(); renderIssues(); });
@@ -657,7 +809,12 @@ async function showLogin() {
 }
 async function showApp() {
   $("#login").hidden = true; $("#app").hidden = false; route();
-  try { await refresh(); } catch (e) { if ($("#login").hidden) toast(e.message); }
+  try { await refresh(); flush(); }
+  catch (e) {
+    // No signal: open with the copy saved on this device.
+    if (e.offline && (loaded || (await loadCache()))) { renderAll(); recount(); }
+    else if ($("#login").hidden) toast(e.message);
+  }
 }
 $("#login-back").addEventListener("click", () => { $("#login-name").readOnly = false; setLoginMode("login"); $("#login-name").select(); });
 $("#login-form").addEventListener("submit", async e => {
@@ -674,10 +831,18 @@ $("#login-form").addEventListener("submit", async e => {
   } catch (err) { $("#login-err").textContent = err.message; }
   finally { btn.disabled = false; }
 });
-$("#signout").addEventListener("click", async () => { await api("/api/login", { method: "DELETE" }).catch(() => {}); $("#d-account").close(); showLogin(); });
+$("#signout").addEventListener("click", async () => {
+  if (pendingCount && !confirm(`${plural(pendingCount, "change")} haven't been sent yet. They stay on this device and send next time you sign in here. Sign out?`)) return;
+  await api("/api/login", { method: "DELETE" }).catch(() => {}); $("#d-account").close(); showLogin();
+});
 // Keep everyone's phones up to date.
 const anySheetOpen = () => $$("dialog").some(d => d.open);
-setInterval(() => { if (!document.hidden && loaded && !anySheetOpen()) refresh().catch(() => {}); }, 30000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden && loaded) refresh().catch(() => {}); });
+setInterval(() => { if (!document.hidden && loaded && !anySheetOpen()) (pendingCount ? flush() : refresh()).catch(() => {}); }, 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && loaded) flush().then(() => refresh()).catch(() => {}); });
 
-api("/api/login").then(r => r.signedIn ? showApp() : showLogin()).catch(() => showLogin());
+(async function boot() {
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+  await loadLocalPhotos().catch(() => {});
+  try { const r = await api("/api/login"); r.signedIn ? showApp() : showLogin(); }
+  catch (e) { if (e.offline && (await loadCache())) showApp(); else showLogin(); }
+})();
